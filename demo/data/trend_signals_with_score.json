@@ -1,0 +1,511 @@
+[
+  {
+    "trend_id": "TREND_20260504_001",
+    "platform": "小红书",
+    "keyword": "猫眼美甲",
+    "caption": "暗黑猫眼太绝了！磁铁石流动感，通勤约会都好搭",
+    "image_urls": [
+      "demo/images/trend_001.jpg"
+    ],
+    "likes": 72000,
+    "comments": 5800,
+    "shares": 2100,
+    "collects": 14200,
+    "publish_time": "2026-05-03T10:00:00+08:00",
+    "captured_at": "2026-05-04T08:00:00+08:00",
+    "style_tags": [
+      "猫眼",
+      "磁铁",
+      "暗黑"
+    ],
+    "color_tags": [
+      "深蓝",
+      "黑色"
+    ],
+    "material_tags": [
+      "猫眼",
+      "磁铁石"
+    ],
+    "scene_tags": [
+      "通勤",
+      "约会"
+    ],
+    "composite_score": 67300.0
+  },
+  {
+    "trend_id": "TREND_20260504_002",
+    "platform": "抖音",
+    "keyword": "冰透蓝猫眼",
+    "caption": "夏天一定要试的冰透猫眼美甲，显白显手细",
+    "image_urls": [
+      "demo/images/trend_002.jpg"
+    ],
+    "likes": 58000,
+    "comments": 4200,
+    "shares": 3100,
+    "collects": 9800,
+    "publish_time": "2026-05-04T09:00:00+08:00",
+    "captured_at": "2026-05-04T10:00:00+08:00",
+    "style_tags": [
+      "冰透",
+      "猫眼",
+      "显白"
+    ],
+    "color_tags": [
+      "蓝色",
+      "冰蓝"
+    ],
+    "material_tags": [
+      "猫眼",
+      "冰透"
+    ],
+    "scene_tags": [
+      "夏季",
+      "约会",
+      "显白"
+    ],
+    "composite_score": 54100.0
+  },
+  {
+    "trend_id": "TREND_20260504_003",
+    "platform": "小红书",
+    "keyword": "法式渐变美甲",
+    "caption": "春夏必做！法式渐变，简约高级感拉满",
+    "image_urls": [
+      "demo/images/trend_003.jpg"
+    ],
+    "likes": 45000,
+    "comments": 3600,
+    "shares": 1800,
+    "collects": 12000,
+    "publish_time": "2026-05-02T14:00:00+08:00",
+    "captured_at": "2026-05-04T08:30:00+08:00",
+    "style_tags": [
+      "法式",
+      "渐变",
+      "高级感"
+    ],
+    "color_tags": [
+      "裸粉",
+      "白色"
+    ],
+    "material_tags": [
+      "甲油胶"
+    ],
+    "scene_tags": [
+      "通勤",
+      "商务",
+      "日常"
+    ],
+    "composite_score": 47700.0
+  },
+  {
+    "trend_id": "TREND_20260504_004",
+    "platform": "Instagram",
+    "keyword": "3D立体美甲",
+    "caption": "3D floral nail art is having a moment! Spring vibes only 🌸",
+    "image_urls": [
+      "demo/images/trend_004.jpg"
+    ],
+    "likes": 38000,
+    "comments": 2900,
+    "shares": 4200,
+    "collects": 7600,
+    "publish_time": "2026-05-03T18:00:00+08:00",
+    "captured_at": "2026-05-04T09:00:00+08:00",
+    "style_tags": [
+      "3D立体",
+      "浮雕",
+      "花卉"
+    ],
+    "color_tags": [
+      "粉色",
+      "白色"
+    ],
+    "material_tags": [
+      "3D雕花",
+      "硬胶"
+    ],
+    "scene_tags": [
+      "春季",
+      "约会",
+      "拍照"
+    ],
+    "composite_score": 41700.0
+  },
+  {
+    "trend_id": "TREND_20260504_005",
+    "platform": "抖音",
+    "keyword": "奶油美甲",
+    "caption": "奶油质感美甲，哑光柔雾感太治愈了",
+    "image_urls": [
+      "demo/images/trend_005.jpg"
+    ],
+    "likes": 35000,
+    "comments": 2100,
+    "shares": 1500,
+    "collects": 8900,
+    "publish_time": "2026-05-04T07:00:00+08:00",
+    "captured_at": "2026-05-04T10:30:00+08:00",
+    "style_tags": [
+      "奶油",
+      "哑光",
+      "柔雾"
+    ],
+    "color_tags": [
+      "裸色",
+      "米白"
+    ],
+    "material_tags": [
+      "哑光",
+      "凝胶"
+    ],
+    "scene_tags": [
+      "日常",
+      "通勤",
+      "治愈"
+    ],
+    "composite_score": 35950.0
+  },
+  {
+    "trend_id": "TREND_20260504_006",
+    "platform": "小红书",
+    "keyword": "星月美甲",
+    "caption": "星月主题美甲，梦幻浪漫，和男友约会必做款",
+    "image_urls": [
+      "demo/images/trend_006.jpg"
+    ],
+    "likes": 29000,
+    "comments": 1800,
+    "shares": 2400,
+    "collects": 6200,
+    "publish_time": "2026-05-03T20:00:00+08:00",
+    "captured_at": "2026-05-04T08:00:00+08:00",
+    "style_tags": [
+      "星月",
+      "浪漫",
+      "梦幻"
+    ],
+    "color_tags": [
+      "深蓝",
+      "金色",
+      "银色"
+    ],
+    "material_tags": [
+      "亮片",
+      "碎钻"
+    ],
+    "scene_tags": [
+      "约会",
+      "晚宴",
+      "节日"
+    ],
+    "composite_score": 30400.0
+  },
+  {
+    "trend_id": "TREND_20260504_007",
+    "platform": "抖音",
+    "keyword": "镜面美甲",
+    "caption": "镜面金属光泽，科技感超强！2026最火款",
+    "image_urls": [
+      "demo/images/trend_007.jpg"
+    ],
+    "likes": 26000,
+    "comments": 1600,
+    "shares": 1900,
+    "collects": 5800,
+    "publish_time": "2026-05-02T19:00:00+08:00",
+    "captured_at": "2026-05-04T09:30:00+08:00",
+    "style_tags": [
+      "镜面",
+      "金属",
+      "科技感"
+    ],
+    "color_tags": [
+      "银色",
+      "金色",
+      "玫瑰金"
+    ],
+    "material_tags": [
+      "镜面粉",
+      "铝箔"
+    ],
+    "scene_tags": [
+      "派对",
+      "拍照",
+      "晚宴"
+    ],
+    "composite_score": 27100.0
+  },
+  {
+    "trend_id": "TREND_20260504_008",
+    "platform": "Instagram",
+    "keyword": "渐变美甲",
+    "caption": "Summer ombre nails hitting different 🌈 lavender to coral gradient",
+    "image_urls": [
+      "demo/images/trend_008.jpg"
+    ],
+    "likes": 22000,
+    "comments": 1400,
+    "shares": 2600,
+    "collects": 4900,
+    "publish_time": "2026-05-03T15:00:00+08:00",
+    "captured_at": "2026-05-04T10:00:00+08:00",
+    "style_tags": [
+      "渐变",
+      "彩色",
+      "夏季"
+    ],
+    "color_tags": [
+      "紫色",
+      "粉色",
+      "珊瑚色"
+    ],
+    "material_tags": [
+      "甲油胶",
+      "海绵晕染"
+    ],
+    "scene_tags": [
+      "夏季",
+      "度假",
+      "拍照"
+    ],
+    "composite_score": 24950.0
+  },
+  {
+    "trend_id": "TREND_20260504_009",
+    "platform": "小红书",
+    "keyword": "贴片美甲",
+    "caption": "免去美甲店！自己贴贴片，5分钟搞定",
+    "image_urls": [
+      "demo/images/trend_009.jpg"
+    ],
+    "likes": 18000,
+    "comments": 3200,
+    "shares": 5600,
+    "collects": 11000,
+    "publish_time": "2026-05-01T12:00:00+08:00",
+    "captured_at": "2026-05-04T08:00:00+08:00",
+    "style_tags": [
+      "贴片",
+      "DIY",
+      "便捷"
+    ],
+    "color_tags": [
+      "多色"
+    ],
+    "material_tags": [
+      "甲片",
+      "贴片"
+    ],
+    "scene_tags": [
+      "日常",
+      "出游",
+      "DIY"
+    ],
+    "composite_score": 39900.0
+  },
+  {
+    "trend_id": "TREND_20260504_010",
+    "platform": "抖音",
+    "keyword": "大理石纹美甲",
+    "caption": "大理石纹美甲教程，高级感爆棚，步骤超简单",
+    "image_urls": [
+      "demo/images/trend_010.jpg"
+    ],
+    "likes": 16000,
+    "comments": 1200,
+    "shares": 980,
+    "collects": 4200,
+    "publish_time": "2026-05-02T16:00:00+08:00",
+    "captured_at": "2026-05-04T09:00:00+08:00",
+    "style_tags": [
+      "大理石纹",
+      "高级感",
+      "纹理"
+    ],
+    "color_tags": [
+      "白色",
+      "灰色",
+      "米色"
+    ],
+    "material_tags": [
+      "甲油胶",
+      "拉线笔"
+    ],
+    "scene_tags": [
+      "通勤",
+      "商务",
+      "日常"
+    ],
+    "composite_score": 17460.0
+  },
+  {
+    "trend_id": "TREND_20260504_011",
+    "platform": "小红书",
+    "keyword": "彩绘美甲",
+    "caption": "手绘小花美甲，超级可爱，显手白❤️",
+    "image_urls": [
+      "demo/images/trend_011.jpg"
+    ],
+    "likes": 14000,
+    "comments": 980,
+    "shares": 760,
+    "collects": 3800,
+    "publish_time": "2026-05-03T11:00:00+08:00",
+    "captured_at": "2026-05-04T08:30:00+08:00",
+    "style_tags": [
+      "彩绘",
+      "手绘",
+      "花卉"
+    ],
+    "color_tags": [
+      "粉色",
+      "白色"
+    ],
+    "material_tags": [
+      "彩绘胶",
+      "细笔"
+    ],
+    "scene_tags": [
+      "约会",
+      "春季",
+      "少女"
+    ],
+    "composite_score": 15200.0
+  },
+  {
+    "trend_id": "TREND_20260504_012",
+    "platform": "Instagram",
+    "keyword": "极简纯色美甲",
+    "caption": "Clean girl aesthetic: minimalist solid nails never go out of style",
+    "image_urls": [
+      "demo/images/trend_012.jpg"
+    ],
+    "likes": 12000,
+    "comments": 680,
+    "shares": 890,
+    "collects": 3200,
+    "publish_time": "2026-05-01T20:00:00+08:00",
+    "captured_at": "2026-05-04T10:00:00+08:00",
+    "style_tags": [
+      "纯色",
+      "极简",
+      "百搭"
+    ],
+    "color_tags": [
+      "裸色",
+      "奶白"
+    ],
+    "material_tags": [
+      "甲油胶"
+    ],
+    "scene_tags": [
+      "日常",
+      "通勤",
+      "百搭"
+    ],
+    "composite_score": 13260.0
+  },
+  {
+    "trend_id": "TREND_20260504_013",
+    "platform": "抖音",
+    "keyword": "碎钻美甲",
+    "caption": "碎钻铺满整片甲，超级闪，婚礼伴娘必做款",
+    "image_urls": [
+      "demo/images/trend_013.jpg"
+    ],
+    "likes": 10000,
+    "comments": 820,
+    "shares": 1100,
+    "collects": 2600,
+    "publish_time": "2026-05-02T13:00:00+08:00",
+    "captured_at": "2026-05-04T09:30:00+08:00",
+    "style_tags": [
+      "碎钻",
+      "闪耀",
+      "婚礼"
+    ],
+    "color_tags": [
+      "透明",
+      "裸粉"
+    ],
+    "material_tags": [
+      "碎钻",
+      "水钻"
+    ],
+    "scene_tags": [
+      "婚礼",
+      "晚宴",
+      "节日"
+    ],
+    "composite_score": 11920.0
+  },
+  {
+    "trend_id": "TREND_20260504_014",
+    "platform": "小红书",
+    "keyword": "浮雕美甲",
+    "caption": "浮雕立体玫瑰，艺术感满分！高端美甲店同款",
+    "image_urls": [
+      "demo/images/trend_014.jpg"
+    ],
+    "likes": 8500,
+    "comments": 620,
+    "shares": 480,
+    "collects": 2100,
+    "publish_time": "2026-05-03T16:00:00+08:00",
+    "captured_at": "2026-05-04T08:00:00+08:00",
+    "style_tags": [
+      "浮雕",
+      "立体",
+      "玫瑰"
+    ],
+    "color_tags": [
+      "白色",
+      "裸粉"
+    ],
+    "material_tags": [
+      "硬胶",
+      "雕花"
+    ],
+    "scene_tags": [
+      "约会",
+      "晚宴",
+      "高端"
+    ],
+    "composite_score": 8980.0
+  },
+  {
+    "trend_id": "TREND_20260504_015",
+    "platform": "Instagram",
+    "keyword": "法式美甲",
+    "caption": "Classic French tip is back and better than ever — timeless elegance ✨",
+    "image_urls": [
+      "demo/images/trend_015.jpg"
+    ],
+    "likes": 7200,
+    "comments": 540,
+    "shares": 620,
+    "collects": 1900,
+    "publish_time": "2026-05-01T18:00:00+08:00",
+    "captured_at": "2026-05-04T10:00:00+08:00",
+    "style_tags": [
+      "法式",
+      "经典",
+      "简约"
+    ],
+    "color_tags": [
+      "白色",
+      "裸色"
+    ],
+    "material_tags": [
+      "甲油胶"
+    ],
+    "scene_tags": [
+      "通勤",
+      "商务",
+      "日常"
+    ],
+    "composite_score": 8230.0
+  }
+]

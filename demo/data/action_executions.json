@@ -1,0 +1,188 @@
+[
+  {
+    "action_id": "A001",
+    "action_type": "generate_style_image",
+    "action_name": "款式图像生成",
+    "trend_id": "TREND_20260504_001",
+    "style_id": "cat_eye",
+    "module_output_id": "MO001",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "猫眼美甲外部热度100分，立即生成展示图",
+    "inputs": {
+      "nail_style": "cat_eye",
+      "user_image": "demo/static/hand_reference.jpg",
+      "prompt": "dark cat eye nail art, magnetic shimmer, professional photography"
+    },
+    "outputs": {
+      "image_url": "demo/static/nail_reference.jpg",
+      "quality_score": 88
+    },
+    "status": "success",
+    "next_step": ["launch_style_to_library", "generate_marketing_content"],
+    "created_at": "2026-05-04T18:01:00+08:00",
+    "finished_at": "2026-05-04T18:01:45+08:00"
+  },
+  {
+    "action_id": "A002",
+    "action_type": "generate_style_image",
+    "action_name": "款式图像生成",
+    "trend_id": "TREND_20260504_002",
+    "style_id": "ice_blue_cat_eye",
+    "module_output_id": "MO002",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "冰透蓝猫眼为款式库新缺口，生成趋势新款展示图",
+    "inputs": {
+      "nail_style": "cat_eye",
+      "user_image": "demo/static/hand_reference.jpg",
+      "prompt": "ice blue translucent cat eye nail art, glossy, summer vibes"
+    },
+    "outputs": {
+      "image_url": "demo/static/nail_reference.jpg",
+      "quality_score": 91
+    },
+    "status": "success",
+    "next_step": ["launch_style_to_library", "generate_marketing_content"],
+    "created_at": "2026-05-04T18:01:30+08:00",
+    "finished_at": "2026-05-04T18:02:15+08:00"
+  },
+  {
+    "action_id": "A003",
+    "action_type": "generate_style_image",
+    "action_name": "款式图像生成",
+    "trend_id": "TREND_20260504_003",
+    "style_id": "french",
+    "module_output_id": "MO001",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "法式渐变排名第3，生成更新展示图",
+    "inputs": {
+      "nail_style": "french",
+      "user_image": "demo/static/hand_reference.jpg",
+      "prompt": "French manicure with subtle gradient, elegant, professional"
+    },
+    "outputs": {
+      "image_url": "demo/static/nail_reference.jpg",
+      "quality_score": 85
+    },
+    "status": "success",
+    "next_step": ["generate_marketing_content"],
+    "created_at": "2026-05-04T18:02:00+08:00",
+    "finished_at": "2026-05-04T18:02:40+08:00"
+  },
+  {
+    "action_id": "A004",
+    "action_type": "generate_marketing_content",
+    "action_name": "运营内容生成",
+    "trend_id": "TREND_20260504_001",
+    "style_id": "cat_eye",
+    "module_output_id": "MO004",
+    "trigger_source": "ACTION_OUTPUT",
+    "trigger_reason": "A001 执行成功后触发营销内容生成",
+    "inputs": {
+      "style_name": "猫眼美甲",
+      "image_url": "demo/static/nail_reference.jpg",
+      "platforms": ["xiaohongshu", "douyin", "instagram"]
+    },
+    "outputs": {
+      "xiaohongshu_caption": "暗黑猫眼，磁铁石流动感✨ 通勤约会都绝了，低调的魅力就是这么来的",
+      "douyin_caption": "暗黑猫眼美甲，磁铁石流动感，低调又高级",
+      "instagram_caption": "Dark cat-eye nails with magnetic shimmer — effortlessly chic"
+    },
+    "status": "success",
+    "next_step": ["schedule_posts"],
+    "created_at": "2026-05-04T18:03:00+08:00",
+    "finished_at": "2026-05-04T18:03:20+08:00"
+  },
+  {
+    "action_id": "A005",
+    "action_type": "launch_style_to_library",
+    "action_name": "款式入库",
+    "trend_id": "TREND_20260504_002",
+    "style_id": "ice_blue_cat_eye",
+    "module_output_id": "MO002",
+    "trigger_source": "ACTION_OUTPUT",
+    "trigger_reason": "冰透蓝猫眼通过质量审核，写入款式库",
+    "inputs": {
+      "style_id": "ice_blue_cat_eye",
+      "style_name": "冰透蓝猫眼",
+      "image_url": "demo/static/nail_reference.jpg",
+      "style_tags": ["冰透", "猫眼", "蓝色", "显白"],
+      "try_on_enabled": true
+    },
+    "outputs": {
+      "library_id": "ice_blue_cat_eye",
+      "status": "launched"
+    },
+    "status": "success",
+    "next_step": ["update_homepage_recommendation"],
+    "created_at": "2026-05-04T18:03:30+08:00",
+    "finished_at": "2026-05-04T18:03:35+08:00"
+  },
+  {
+    "action_id": "A006",
+    "action_type": "generate_style_image",
+    "action_name": "款式图像生成",
+    "trend_id": "TREND_20260504_004",
+    "style_id": "emboss",
+    "module_output_id": "MO001",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "3D立体美甲排名第4，生成展示图",
+    "inputs": {
+      "nail_style": "emboss",
+      "user_image": "demo/static/hand_reference.jpg",
+      "prompt": "3D floral embossed nail art, white flowers, spring vibes"
+    },
+    "outputs": {
+      "image_url": null,
+      "error": "ComfyUI job timeout"
+    },
+    "status": "pending",
+    "next_step": ["retry_generation"],
+    "created_at": "2026-05-04T18:02:30+08:00",
+    "finished_at": "2026-05-04T18:04:30+08:00"
+  },
+  {
+    "action_id": "A007",
+    "action_type": "generate_style_image",
+    "action_name": "款式图像生成",
+    "trend_id": "TREND_20260504_005",
+    "style_id": "matte_cream",
+    "module_output_id": "MO001",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "奶油美甲排名第5，生成哑光质感展示图",
+    "inputs": {
+      "nail_style": "solid",
+      "user_image": "demo/static/hand_reference.jpg",
+      "prompt": "matte cream nail art, soft texture, minimalist, elegant"
+    },
+    "outputs": {
+      "image_url": "demo/static/nail_reference.jpg",
+      "quality_score": 82
+    },
+    "status": "success",
+    "next_step": ["generate_marketing_content"],
+    "created_at": "2026-05-04T18:03:00+08:00",
+    "finished_at": "2026-05-04T18:03:50+08:00"
+  },
+  {
+    "action_id": "A008",
+    "action_type": "update_homepage_recommendation",
+    "action_name": "首页推荐更新",
+    "trend_id": null,
+    "style_id": null,
+    "module_output_id": "MO003",
+    "trigger_source": "MODULE_OUTPUT",
+    "trigger_reason": "猫眼系列推荐分最高，更新首页 Top5",
+    "inputs": {
+      "style_ids": ["cat_eye", "ice_blue_cat_eye"],
+      "recommendation_status": "homepage_top5"
+    },
+    "outputs": {
+      "updated_count": 2,
+      "homepage_top5": ["cat_eye", "ice_blue_cat_eye", "french", "matte_cream", "emboss"]
+    },
+    "status": "success",
+    "next_step": [],
+    "created_at": "2026-05-04T18:04:00+08:00",
+    "finished_at": "2026-05-04T18:04:02+08:00"
+  }
+]

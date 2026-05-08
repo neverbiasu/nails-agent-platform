@@ -1,0 +1,187 @@
+[
+  {
+    "card_id": "SC001",
+    "trend_id": "TREND_20260504_001",
+    "style_id": "cat_eye",
+    "style_name": "猫眼美甲",
+    "style_tags": ["猫眼", "磁铁", "暗黑"],
+    "image_url": "demo/static/nail_reference.jpg",
+    "launch_priority_score": 88.7,
+    "generation_status": "success",
+    "platform_variants": {
+      "xiaohongshu": {
+        "caption": "暗黑猫眼太绝了！磁铁石流动感超强，每个角度都是不同的光影效果✨ 低调有魅力，通勤约会都能驾驭～",
+        "hashtags": ["#美甲", "#猫眼美甲", "#暗黑风美甲", "#美甲推荐", "#秋冬美甲"]
+      },
+      "douyin": {
+        "caption": "暗黑猫眼美甲，磁铁石流动感✨ 低调又高级，你值得拥有",
+        "hashtags": ["#美甲", "#猫眼美甲", "#美甲教程"]
+      },
+      "instagram": {
+        "caption": "Dark cat-eye nails with magnetic shimmer — effortlessly chic for any occasion. Perfect for fall vibes ✨",
+        "hashtags": ["#nailart", "#cateyenails", "#magneticnails"]
+      }
+    },
+    "pricing": {
+      "base_price": "¥89",
+      "premium_price": "¥168",
+      "promo_price": "¥59",
+      "premium_reason": "限定磁铁石材料+延长设计+拍照服务"
+    },
+    "schedule": {
+      "priority": "P0",
+      "xiaohongshu_publish_at": "2026-05-07T20:00:00+08:00",
+      "douyin_publish_at": "2026-05-09T18:00:00+08:00",
+      "instagram_publish_at": "2026-05-10T10:00:00+08:00"
+    },
+    "created_at": "2026-05-04T18:04:00+08:00"
+  },
+  {
+    "card_id": "SC002",
+    "trend_id": "TREND_20260504_002",
+    "style_id": "ice_blue_cat_eye",
+    "style_name": "冰透蓝猫眼",
+    "style_tags": ["冰透", "猫眼", "蓝色", "显白"],
+    "image_url": "demo/static/nail_reference.jpg",
+    "launch_priority_score": 85.4,
+    "generation_status": "success",
+    "platform_variants": {
+      "xiaohongshu": {
+        "caption": "夏天必备的冰透蓝猫眼来了！清透感超强，显白显手细，和同事出去被夸了三次🤩 这个颜色也太好看了吧",
+        "hashtags": ["#美甲", "#猫眼美甲", "#冰透美甲", "#显白美甲", "#夏季美甲"]
+      },
+      "douyin": {
+        "caption": "冰透蓝猫眼，夏天第一款美甲就选它！显白显手细",
+        "hashtags": ["#美甲", "#夏季美甲", "#猫眼美甲"]
+      },
+      "instagram": {
+        "caption": "Ice blue cat-eye nails — the perfect summer statement. Translucent shimmer that makes your fingers look longer 💙",
+        "hashtags": ["#summernails", "#cateyenails", "#bluenails"]
+      }
+    },
+    "pricing": {
+      "base_price": "¥99",
+      "premium_price": "¥188",
+      "promo_price": "¥69",
+      "premium_reason": "进口冰透材料+定制冰蓝配色+首发新款溢价"
+    },
+    "schedule": {
+      "priority": "P0",
+      "xiaohongshu_publish_at": "2026-05-07T20:00:00+08:00",
+      "douyin_publish_at": "2026-05-09T18:00:00+08:00",
+      "instagram_publish_at": "2026-05-10T10:00:00+08:00"
+    },
+    "created_at": "2026-05-04T18:04:00+08:00"
+  },
+  {
+    "card_id": "SC003",
+    "trend_id": "TREND_20260504_003",
+    "style_id": "french",
+    "style_name": "法式渐变美甲",
+    "style_tags": ["法式", "渐变", "高级感"],
+    "image_url": "demo/static/nail_reference.jpg",
+    "launch_priority_score": 63.1,
+    "generation_status": "success",
+    "platform_variants": {
+      "xiaohongshu": {
+        "caption": "法式渐变美甲，春夏必做！简约而不简单，裸粉+白色渐变，高级感拉满，上班面试都能穿",
+        "hashtags": ["#美甲", "#法式美甲", "#渐变美甲", "#高级感美甲", "#春夏美甲"]
+      },
+      "douyin": {
+        "caption": "法式渐变美甲，简约高级感，通勤百搭首选",
+        "hashtags": ["#美甲", "#法式美甲", "#渐变美甲"]
+      },
+      "instagram": {
+        "caption": "French gradient nails — understated elegance that works from office to date night",
+        "hashtags": ["#frenchnails", "#gradientnails", "#minimalistnails"]
+      }
+    },
+    "pricing": {
+      "base_price": "¥79",
+      "premium_price": "¥138",
+      "promo_price": "¥55",
+      "premium_reason": "高端裸粉甲油胶+精细渐变工艺"
+    },
+    "schedule": {
+      "priority": "P1",
+      "xiaohongshu_publish_at": "2026-05-14T20:00:00+08:00",
+      "douyin_publish_at": "2026-05-16T18:00:00+08:00",
+      "instagram_publish_at": "2026-05-17T10:00:00+08:00"
+    },
+    "created_at": "2026-05-04T18:04:00+08:00"
+  },
+  {
+    "card_id": "SC004",
+    "trend_id": "TREND_20260504_004",
+    "style_id": "emboss",
+    "style_name": "3D立体浮雕美甲",
+    "style_tags": ["3D立体", "浮雕", "花卉"],
+    "image_url": "demo/static/nail_reference.jpg",
+    "launch_priority_score": 57.0,
+    "generation_status": "pending",
+    "platform_variants": {
+      "xiaohongshu": {
+        "caption": "3D立体浮雕美甲，小白花从指甲上长出来了！艺术感满分，春天约会拍照必备款",
+        "hashtags": ["#美甲", "#浮雕美甲", "#3D美甲", "#春季美甲", "#艺术美甲"]
+      },
+      "douyin": {
+        "caption": "3D立体浮雕美甲，小花从指甲上长出来了！太好看了",
+        "hashtags": ["#美甲", "#3D美甲", "#浮雕美甲"]
+      },
+      "instagram": {
+        "caption": "3D floral embossed nails — spring blooms on your fingertips 🌸 Art that you wear",
+        "hashtags": ["#3dnailart", "#floralnails", "#springnails"]
+      }
+    },
+    "pricing": {
+      "base_price": "¥128",
+      "premium_price": "¥228",
+      "promo_price": "¥88",
+      "premium_reason": "手工雕花工艺+进口硬胶材料+制作时间较长"
+    },
+    "schedule": {
+      "priority": "P1",
+      "xiaohongshu_publish_at": "2026-05-14T20:00:00+08:00",
+      "douyin_publish_at": "2026-05-16T18:00:00+08:00",
+      "instagram_publish_at": "2026-05-17T10:00:00+08:00"
+    },
+    "created_at": "2026-05-04T18:04:00+08:00"
+  },
+  {
+    "card_id": "SC005",
+    "trend_id": "TREND_20260504_005",
+    "style_id": "matte_cream",
+    "style_name": "奶油哑光美甲",
+    "style_tags": ["奶油", "哑光", "柔雾"],
+    "image_url": "demo/static/nail_reference.jpg",
+    "launch_priority_score": 50.4,
+    "generation_status": "success",
+    "platform_variants": {
+      "xiaohongshu": {
+        "caption": "奶油哑光美甲，柔雾质感太治愈了🤍 裸色系百搭，看起来皮肤超好的那种，每天看自己的手都开心",
+        "hashtags": ["#美甲", "#奶油美甲", "#哑光美甲", "#裸色美甲", "#治愈美甲"]
+      },
+      "douyin": {
+        "caption": "奶油哑光美甲，柔雾质感超治愈，裸色百搭好看",
+        "hashtags": ["#美甲", "#奶油美甲", "#哑光美甲"]
+      },
+      "instagram": {
+        "caption": "Cream matte nails — soft, minimal, and endlessly chic. The 'your skin but better' of nail art ✨",
+        "hashtags": ["#mattenails", "#creamynails", "#minimalistnails"]
+      }
+    },
+    "pricing": {
+      "base_price": "¥69",
+      "premium_price": "¥118",
+      "promo_price": "¥49",
+      "premium_reason": "进口哑光胶+凝胶质感处理"
+    },
+    "schedule": {
+      "priority": "P2",
+      "xiaohongshu_publish_at": "2026-05-21T20:00:00+08:00",
+      "douyin_publish_at": "2026-05-23T18:00:00+08:00",
+      "instagram_publish_at": "2026-05-24T10:00:00+08:00"
+    },
+    "created_at": "2026-05-04T18:04:00+08:00"
+  }
+]

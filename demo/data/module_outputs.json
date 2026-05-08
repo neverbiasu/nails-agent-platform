@@ -1,0 +1,62 @@
+[
+  {
+    "module_output_id": "MO001",
+    "module_name": "trend_opportunity_detection",
+    "decision": "发现 2 个高优先级趋势机会",
+    "opportunity_type": "external_hot_internal_gap",
+    "priority": "high",
+    "target_trend_ids": ["TREND_20260504_001", "TREND_20260504_002"],
+    "metric_ids": ["M001", "M002"],
+    "reason": "猫眼美甲外部热度满分，冰透蓝猫眼款式库缺口91.7，两者均具备立即上架价值",
+    "recommended_actions": ["generate_style_image", "generate_marketing_content", "launch_style_to_library"],
+    "created_at": "2026-05-04T18:01:00+08:00"
+  },
+  {
+    "module_output_id": "MO002",
+    "module_name": "trend_style_launch",
+    "decision": "建议上架冰透蓝猫眼为趋势新款",
+    "opportunity_type": "new_style_gap",
+    "priority": "high",
+    "target_trend_ids": ["TREND_20260504_002"],
+    "metric_ids": ["M002"],
+    "reason": "款式库中无对应款式，外部热度持续增长，适合作为差异化新品推出",
+    "recommended_actions": ["generate_or_enhance_style", "launch_style_to_library"],
+    "created_at": "2026-05-04T18:01:30+08:00"
+  },
+  {
+    "module_output_id": "MO003",
+    "module_name": "homepage_recommendation",
+    "decision": "推荐猫眼美甲和冰透蓝猫眼进入首页 Top5",
+    "opportunity_type": "recommendation_boost",
+    "priority": "medium",
+    "target_trend_ids": ["TREND_20260504_001", "TREND_20260504_002"],
+    "metric_ids": ["M001", "M002"],
+    "reason": "综合推荐分最高，试戴转化潜力大",
+    "recommended_actions": ["update_homepage_recommendation"],
+    "created_at": "2026-05-04T18:02:00+08:00"
+  },
+  {
+    "module_output_id": "MO004",
+    "module_name": "content_strategy",
+    "decision": "本周重点推广猫眼系列，小红书+抖音双平台联动",
+    "opportunity_type": "content_campaign",
+    "priority": "high",
+    "target_trend_ids": ["TREND_20260504_001", "TREND_20260504_002"],
+    "metric_ids": ["M001", "M002"],
+    "reason": "两款均属于猫眼系列，可形成系列营销合力",
+    "recommended_actions": ["generate_marketing_content", "schedule_posts"],
+    "created_at": "2026-05-04T18:02:30+08:00"
+  },
+  {
+    "module_output_id": "MO005",
+    "module_name": "pipeline_summary",
+    "decision": "本轮流水线完成，产出 5 款样式卡片，2 个 P0 运营方案",
+    "opportunity_type": "pipeline_complete",
+    "priority": "low",
+    "target_trend_ids": ["TREND_20260504_001", "TREND_20260504_002", "TREND_20260504_003", "TREND_20260504_004", "TREND_20260504_005"],
+    "metric_ids": ["M001", "M002", "M003", "M004", "M005"],
+    "reason": "流水线正常执行完成",
+    "recommended_actions": ["send_report_to_user"],
+    "created_at": "2026-05-04T18:05:00+08:00"
+  }
+]

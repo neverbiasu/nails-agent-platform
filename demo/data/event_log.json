@@ -1,0 +1,133 @@
+[
+  {
+    "event_id": "LOG001",
+    "event_type": "PipelineStart",
+    "source_agent": "nails-orchestrator",
+    "timestamp": "2026-05-04T18:00:00+08:00",
+    "payload": { "summary": "流水线启动，触发方式：Telegram 指令", "trigger": "分析本周美甲趋势" }
+  },
+  {
+    "event_id": "LOG002",
+    "event_type": "AgentStart",
+    "source_agent": "trend-analyst",
+    "timestamp": "2026-05-04T18:00:02+08:00",
+    "payload": { "summary": "开始分析 15 条趋势信号", "input_count": 15 }
+  },
+  {
+    "event_id": "LOG003",
+    "event_type": "DataProduced",
+    "source_agent": "trend-analyst",
+    "timestamp": "2026-05-04T18:00:18+08:00",
+    "payload": {
+      "summary": "趋势分析完成，产出 top_10",
+      "top_trend": "猫眼美甲",
+      "patterns_count": 3,
+      "anomalies_count": 1
+    }
+  },
+  {
+    "event_id": "LOG004",
+    "event_type": "AgentComplete",
+    "source_agent": "trend-analyst",
+    "timestamp": "2026-05-04T18:00:20+08:00",
+    "payload": { "summary": "趋势分析 Agent 执行完成", "duration_ms": 18000 }
+  },
+  {
+    "event_id": "LOG005",
+    "event_type": "AgentStart",
+    "source_agent": "value-evaluator",
+    "timestamp": "2026-05-04T18:00:22+08:00",
+    "payload": { "summary": "开始对 top_10 进行价值评估", "input_count": 10 }
+  },
+  {
+    "event_id": "LOG006",
+    "event_type": "AgentStart",
+    "source_agent": "asset-generator",
+    "timestamp": "2026-05-04T18:00:22+08:00",
+    "payload": { "summary": "开始为 top_5 生成展示图", "input_count": 5 }
+  },
+  {
+    "event_id": "LOG007",
+    "event_type": "AgentComplete",
+    "source_agent": "value-evaluator",
+    "timestamp": "2026-05-04T18:00:45+08:00",
+    "payload": {
+      "summary": "价值评估完成",
+      "p0_count": 2,
+      "p1_count": 2,
+      "p2_count": 1,
+      "duration_ms": 23000
+    }
+  },
+  {
+    "event_id": "LOG008",
+    "event_type": "DataProduced",
+    "source_agent": "asset-generator",
+    "timestamp": "2026-05-04T18:03:50+08:00",
+    "payload": {
+      "summary": "图像生成完成",
+      "success_count": 4,
+      "pending_count": 1,
+      "total": 5
+    }
+  },
+  {
+    "event_id": "LOG009",
+    "event_type": "AgentComplete",
+    "source_agent": "asset-generator",
+    "timestamp": "2026-05-04T18:04:00+08:00",
+    "payload": { "summary": "素材生成 Agent 执行完成", "duration_ms": 218000 }
+  },
+  {
+    "event_id": "LOG010",
+    "event_type": "AgentStart",
+    "source_agent": "campaign-strategist",
+    "timestamp": "2026-05-04T18:04:02+08:00",
+    "payload": { "summary": "开始生成运营策略", "style_count": 5 }
+  },
+  {
+    "event_id": "LOG011",
+    "event_type": "AgentComplete",
+    "source_agent": "campaign-strategist",
+    "timestamp": "2026-05-04T18:04:38+08:00",
+    "payload": {
+      "summary": "运营策略生成完成",
+      "style_cards_count": 5,
+      "duration_ms": 36000
+    }
+  },
+  {
+    "event_id": "LOG012",
+    "event_type": "AgentStart",
+    "source_agent": "nails-summarizer",
+    "timestamp": "2026-05-04T18:04:40+08:00",
+    "payload": { "summary": "开始汇总流水线结果" }
+  },
+  {
+    "event_id": "LOG013",
+    "event_type": "AgentComplete",
+    "source_agent": "nails-summarizer",
+    "timestamp": "2026-05-04T18:04:55+08:00",
+    "payload": {
+      "summary": "摘要生成完成，报告已准备就绪",
+      "kpis": {
+        "top_trend_name": "猫眼美甲",
+        "top_launch_score": 88.7,
+        "styles_generated": 5,
+        "campaigns_ready": 3
+      },
+      "duration_ms": 15000
+    }
+  },
+  {
+    "event_id": "LOG014",
+    "event_type": "PipelineComplete",
+    "source_agent": "nails-orchestrator",
+    "timestamp": "2026-05-04T18:05:00+08:00",
+    "payload": {
+      "summary": "全流水线执行完成，报告已发送给用户",
+      "total_duration_ms": 298000,
+      "total_duration_human": "约 5 分钟"
+    }
+  }
+]
