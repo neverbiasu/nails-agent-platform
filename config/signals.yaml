@@ -1,0 +1,58 @@
+# Nail trend signal collection config
+
+keywords:
+  primary:
+    - 美甲
+    - 猫眼美甲
+    - 法式美甲
+    - 渐变美甲
+    - 奶油美甲
+    - 3D美甲
+    - 贴片美甲
+    - 冰透美甲
+    - 暗黑美甲
+    - 日式美甲
+  seasonal:
+    - 夏日美甲
+    - 2026美甲趋势
+    - 小众美甲
+
+sources:
+  # ── 免费源 (默认全部启用) ────────────────────────────────────────────────
+  xhs_skills:
+    enabled: true           # 小红书 CDP browser，需已登录
+    keywords: primary       # 用 primary 关键词
+    limit_per_keyword: 10
+    sort_by: 最多点赞
+
+  douyin_cdp:
+    enabled: true           # 抖音 CDP browser，需 Chrome --remote-debugging-port=9222
+    keywords: primary
+    limit_per_keyword: 8
+    cdp_url: http://localhost:9222
+
+  instagram:
+    enabled: true           # 公开 hashtag，instaloader，无需 API key
+    hashtags:
+      - nailart
+      - cateyenails
+      - frenchnails
+      - 3dnailart
+      - gradientnails
+      - gelnails
+    limit_per_hashtag: 8
+
+  # ── 付费源 (可选增强) ────────────────────────────────────────────────────
+  tikhub:
+    enabled: false          # 设 TIKHUB_API_KEY 后自动启用
+    limit_per_keyword: 8
+
+  # ── 兜底 ─────────────────────────────────────────────────────────────────
+  mock:
+    enabled: true
+    path: demo/data/trend_signals.json
+
+collection:
+  parallel: true            # 并行抓取所有可用源
+  deduplicate: true
+  sort_by: composite_score  # likes + collects*1.5 + shares*2 + comments*0.5

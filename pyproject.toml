@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "nails-agent"
+version = "0.2.0"
+description = "AI Nail Trend Analysis & Campaign Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "python-telegram-bot>=20.0",
+]
+
+[project.optional-dependencies]
+demo = [
+    "streamlit>=1.35",
+    "pandas>=2.0",
+    "plotly>=5.18",
+    "altair>=5.0",
+    "Pillow>=10.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff",
+]
+
+[project.scripts]
+nails-api   = "nails_agent.api.main:app"
+nails-bot   = "nails_agent.bot.telegram:run_polling"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nails_agent*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
