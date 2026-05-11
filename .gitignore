@@ -53,3 +53,8 @@ htmlcov/
 
 # Claude session files
 .claude/settings.local.json
+.claude/worktrees/
+.mcp.json
+
+# uv lockfile (not yet adopted; revisit)
+uv.lock
