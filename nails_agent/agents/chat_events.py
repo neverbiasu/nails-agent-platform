@@ -22,9 +22,11 @@ Phase = Literal[
     "idle",
     "plan_review",
     "collecting",
-    "trends_review",
+    "trends_review",      # checkpoint after Step 1
     "evaluating",
-    "strategy_review",
+    "eval_review",        # checkpoint after Step 2 (value eval + asset gen)
+    "strategy_building",
+    "strategy_review",    # checkpoint after Step 3 (campaign strategy)
     "reporting",
     "done",
     "interrupted",

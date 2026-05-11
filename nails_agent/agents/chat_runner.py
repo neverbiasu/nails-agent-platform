@@ -139,12 +139,11 @@ class ChatPipelineRunner:
                 store["phase"] = "idle"
                 return [echo, make_message("assistant", "已取消。")]
 
-        # ── trends_review ──
+        # ── trends_review (Step 1 → Step 2) ──
         if cp == "trends_review":
             if choice == "approve":
-                return [echo, *self._phase_evaluating(store), *self._phase_strategy_review(store)]
+                return [echo, *self._phase_evaluating(store)]
             if choice == "adjust_kws":
-                # Apply new keywords and re-run collecting
                 kws_raw = form.get("keywords", "")
                 kws = [k.strip() for k in kws_raw.replace("，", ",").split(",") if k.strip()]
                 if kws:
@@ -154,7 +153,15 @@ class ChatPipelineRunner:
                 store["phase"] = "interrupted"
                 return [echo, make_message("assistant", "已中止流程。")]
 
-        # ── strategy_review ──
+        # ── eval_review (Step 2 → Step 3) ──
+        if cp == "eval_review":
+            if choice == "approve":
+                return [echo, *self._phase_strategy_building(store)]
+            if choice == "abort":
+                store["phase"] = "interrupted"
+                return [echo, make_message("assistant", "已中止流程。")]
+
+        # ── strategy_review (Step 3 → Step 4) ──
         if cp == "strategy_review":
             if choice == "approve":
                 return [echo, *self._phase_reporting(store)]
@@ -164,13 +171,14 @@ class ChatPipelineRunner:
 
         # ── error checkpoints ──
         if choice == "retry":
-            # Re-run from the failed phase
             failed = store.get("phase", "idle")
-            store["phase"] = "idle"  # reset so handlers fire
+            store["phase"] = "idle"
             if failed == "collecting":
                 return [echo, *self._phase_collecting(store), *self._phase_trends_review(store)]
             if failed == "evaluating":
-                return [echo, *self._phase_evaluating(store), *self._phase_strategy_review(store)]
+                return [echo, *self._phase_evaluating(store)]
+            if failed == "strategy_building":
+                return [echo, *self._phase_strategy_building(store)]
             if failed == "reporting":
                 return [echo, *self._phase_reporting(store)]
             return [echo, make_message("assistant", "未知阶段，无法重试。")]
@@ -306,18 +314,44 @@ class ChatPipelineRunner:
         analysis = ctx["analysis"]
         signals = ctx["signals"]
 
-        # Top-10 keywords + composite scores
         top = analysis.top_10[:10]
         events: List[ChatEvent] = [
             make_phase_enter("trends_review", "趋势分析结果", _elapsed(store)),
         ]
 
-        # Table: top-10 with platform + likes
+        # ① Aggregated style trends (the actual hot styles)
+        if analysis.style_trends:
+            cat_label = {"style": "款式", "color": "色系",
+                         "material": "材质", "scene": "场景"}
+            events.append(make_phase_output(
+                "trends_review",
+                TableOutput(
+                    title="款式热度（按聚合互动量）",
+                    columns=["标签", "类别", "出现帖数", "累计互动", "相对热度"],
+                    rows=[
+                        [t.tag, cat_label.get(t.category, t.category),
+                         t.post_count, t.total_engagement,
+                         round(t.aggregated_score, 1)]
+                        for t in analysis.style_trends[:10]
+                    ],
+                ),
+            ))
+            events.append(make_phase_output(
+                "trends_review",
+                ChartOutput(
+                    title="Top 风格相对热度",
+                    chart_type="bar",
+                    x=[round(t.aggregated_score, 1) for t in analysis.style_trends[:10]],
+                    y=[t.tag for t in analysis.style_trends[:10]],
+                ),
+            ))
+
+        # ② Supporting evidence: top-10 individual posts
         events.append(make_phase_output(
             "trends_review",
             TableOutput(
-                title="Top 10 趋势",
-                columns=["排名", "关键词", "平台", "点赞", "综合分"],
+                title="参考样本 · Top 10 高互动帖",
+                columns=["排名", "来源关键词", "平台", "点赞", "综合分"],
                 rows=[
                     [i + 1, s.keyword, s.platform, s.likes, round(s.composite_score, 1)]
                     for i, s in enumerate(top)
@@ -325,23 +359,21 @@ class ChatPipelineRunner:
             ),
         ))
 
-        # Chart: composite-score bar
-        events.append(make_phase_output(
-            "trends_review",
-            ChartOutput(
-                title="Top 10 综合热度",
-                chart_type="bar",
-                x=[round(s.composite_score, 1) for s in top],
-                y=[f"{s.keyword[:14]}" for s in top],
-            ),
-        ))
-
-        # Pattern markdown summary (patterns is List[str])
-        if analysis.patterns:
-            md = "\n".join(f"- {p}" for p in analysis.patterns[:8])
+        # ③ Patterns + anomalies
+        if analysis.patterns or analysis.anomalies:
+            md_lines = []
+            if analysis.patterns:
+                md_lines.append("**风格组合**")
+                for p in analysis.patterns[:5]:
+                    md_lines.append(f"- {p}")
+            if analysis.anomalies:
+                md_lines.append("")
+                md_lines.append("**近 48h 突发热度**")
+                for a in analysis.anomalies[:5]:
+                    md_lines.append(f"- {a}")
             events.append(make_phase_output(
                 "trends_review",
-                MarkdownOutput(title="高频风格模式", body=md),
+                MarkdownOutput(title="组合 & 异常", body="\n".join(md_lines)),
             ))
 
         kw_default = ",".join(XHS_KEYWORDS[:5])
@@ -416,7 +448,7 @@ class ChatPipelineRunner:
         ))
         ctx["asset_result"] = asset_result
 
-        # Inline outputs (no checkpoint — auto-proceed to strategy_review)
+        # Inline outputs
         events.append(make_phase_output(
             "evaluating",
             TableOutput(
@@ -443,24 +475,40 @@ class ChatPipelineRunner:
                 ],
             ),
         ))
+
+        # ── Checkpoint: eval_review (Step 2 → Step 3) ─────────────────────
+        events.append(make_phase_enter("eval_review", "价值评估结果", _elapsed(store)))
+        top_priority = (value_result.snapshots[0].launch_priority_score
+                        if value_result.snapshots else 0)
+        events.append(make_checkpoint(
+            "eval_review",
+            f"已生成 {len(value_result.snapshots)} 条评估 + {len(asset_result.drafts)} 张素材卡片。"
+            f"最高优先级 {top_priority:.1f}。是否继续到策略制定？",
+            choices=[
+                CheckpointChoice(id="approve", label="✓ 继续到策略制定", style="primary", priority="P1"),
+                CheckpointChoice(id="abort",   label="✗ 结束",          style="danger",  priority="P0"),
+            ],
+            auto_approve_after_s=15,
+            auto_approve_choice_id="approve",
+        ))
         return events
 
-    def _phase_strategy_review(self, store: Dict[str, Any]) -> List[ChatEvent]:
+    def _phase_strategy_building(self, store: Dict[str, Any]) -> List[ChatEvent]:
         ctx = store["context"]
         events: List[ChatEvent] = [
-            make_phase_enter("strategy_review", "Step 3/4 运营策略", _elapsed(store)),
+            make_phase_enter("strategy_building", "Step 3/4 运营策略", _elapsed(store)),
         ]
         t0 = _now_ms()
         try:
             campaign = campaign_strategist.strategise(ctx["value_result"], ctx["asset_result"])
         except Exception as exc:
             events.append(make_error(
-                phase="strategy_review",
+                phase="strategy_building",
                 message=f"campaign_strategist 失败: {exc}",
                 recoverable=True,
                 traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
             ))
-            store["phase"] = "evaluating"   # retry from evaluating
+            store["phase"] = "strategy_building"
             return events
         events.append(make_tool_call(
             tool="campaign_strategist.strategise",
@@ -484,10 +532,12 @@ class ChatPipelineRunner:
             for c in p1[:5]:
                 md_lines.append(f"- {c.style_name}")
         events.append(make_phase_output(
-            "strategy_review",
+            "strategy_building",
             MarkdownOutput(title="本轮策略", body="\n".join(md_lines)),
         ))
 
+        # ── Checkpoint: strategy_review (Step 3 → Step 4) ─────────────────
+        events.append(make_phase_enter("strategy_review", "策略评审", _elapsed(store)))
         events.append(make_checkpoint(
             "strategy_review",
             f"策略已生成（P0 {len(p0)}, P1 {len(p1)}）。是否写入记忆并出报告？",

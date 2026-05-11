@@ -37,10 +37,21 @@ class TrendSignal(BaseModel):
 # Step 1 Output: Trend Analysis
 # ──────────────────────────────────────────────
 
+class StyleTrend(BaseModel):
+    """A style/color/material/scene tag aggregated across all signals."""
+    tag: str                                  # e.g. "猫眼", "法式", "粉色"
+    category: str                             # "style" | "color" | "material" | "scene"
+    post_count: int                           # how many posts carry this tag
+    total_engagement: int                     # sum of likes+collects+shares+comments
+    aggregated_score: float                   # 0-100, normalised across all tags
+    sample_caption: str = ""                  # one representative post caption
+
+
 class TrendAnalysisResult(BaseModel):
-    top_10: List[TrendSignal]
-    patterns: List[str]          # e.g. "猫眼+暗黑 跨平台共振"
-    anomalies: List[str]         # e.g. "冰透蓝 近48h增速 +320%"
+    top_10: List[TrendSignal]                 # individual posts (evidence)
+    style_trends: List[StyleTrend] = []       # aggregated tag trends (the real signal)
+    patterns: List[str]                       # e.g. "猫眼+暗黑 跨平台共振"
+    anomalies: List[str]                      # e.g. "冰透蓝 近48h增速 +320%"
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
