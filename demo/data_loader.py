@@ -1,11 +1,28 @@
 import json
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR   = Path(__file__).parent / "data"
+OUTPUT_DIR = Path(__file__).parent / "output"
+
+# Pipeline persistence wraps lists as {wrapper_key: [...], timestamp: ...}.
+# Mock seeds are flat lists. We unwrap on load so the UI sees one schema.
+_UNWRAP_KEYS = {
+    "metric_snapshots.json": "snapshots",
+    "style_cards.json":      "style_cards",
+}
 
 
 def _load(filename: str):
-    return json.loads((DATA_DIR / filename).read_text(encoding="utf-8"))
+    """Prefer pipeline output (real data) over seed data (mock)."""
+    out = OUTPUT_DIR / filename
+    path = out if out.exists() else (DATA_DIR / filename)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    # Auto-unwrap pipeline outputs to match mock schema
+    if isinstance(data, dict):
+        wrapper = _UNWRAP_KEYS.get(filename)
+        if wrapper and wrapper in data:
+            data = data[wrapper]
+    return data
 
 
 def load_trend_signals():

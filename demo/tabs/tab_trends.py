@@ -30,16 +30,16 @@ def render():
     with col_f2:
         tag_filter = st.multiselect("风格标签筛选", ALL_TAGS)
 
+    # Add composite score to ALL signals first (so top10 below also has _score)
+    max_raw = max(_composite(t) for t in signals) if signals else 1
+    for t in signals:
+        t["_score"] = round(_composite(t) / max_raw * 100, 1)
+
     filtered = signals
     if platform_filter != "全部":
         filtered = [t for t in filtered if t["platform"] == platform_filter]
     if tag_filter:
         filtered = [t for t in filtered if any(tag in t.get("style_tags", []) for tag in tag_filter)]
-
-    # Add composite score
-    max_raw = max(_composite(t) for t in signals) if signals else 1
-    for t in filtered:
-        t["_score"] = round(_composite(t) / max_raw * 100, 1)
 
     filtered_sorted = sorted(filtered, key=lambda t: t["_score"], reverse=True)
 

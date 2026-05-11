@@ -86,6 +86,8 @@ class PipelineOrchestrator:
                 emit(f"📡 数据源：{', '.join(live) if live else '📦 mock (无实时源)'}")
                 signals = self.collector.collect(keywords=self.keywords)
                 emit(f"📥 获取信号 {len(signals)} 条")
+            # Persist raw signals so the demo UI can show real data
+            self._persist_signals(signals)
             library = self._load_library()
 
             # ── Step 1: Trend Analysis ─────────────────────────────────────
@@ -185,6 +187,20 @@ class PipelineOrchestrator:
             return []
         with open(path, encoding="utf-8") as f:
             return [StyleLibraryItem(**item) for item in json.load(f)]
+
+    # ── Raw signal persistence (for demo UI) ────────────────────────────────
+
+    def _persist_signals(self, signals: List[TrendSignal]) -> None:
+        """Write raw signals to output dir so the demo can show real data."""
+        try:
+            import json
+            path = self.output_dir / "trend_signals.json"
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump([s.model_dump() for s in signals], f,
+                          ensure_ascii=False, indent=2)
+            logger.debug("Persisted %d signals to %s", len(signals), path)
+        except Exception as exc:
+            logger.warning("Failed to persist signals: %s", exc)
 
     # ── Memory persistence ──────────────────────────────────────────────────
 
