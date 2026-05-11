@@ -103,10 +103,14 @@ def _classify_tags(tags: List[str], caption: str) -> dict:
 
 
 def _ts_to_iso(ts: int) -> str:
+    """Unix-seconds → ISO. Returns '' for 0/None (sentinel for 'unknown')."""
     try:
+        ts = int(ts)
+        if ts <= 0:
+            return ""
         return datetime.fromtimestamp(ts, tz=_TZ8).isoformat()
-    except Exception:
-        return datetime.now(_TZ8).isoformat()
+    except (ValueError, TypeError, OSError):
+        return ""
 
 
 def _make_trend_id(platform: str, raw_id: str) -> str:

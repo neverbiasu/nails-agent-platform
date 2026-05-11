@@ -151,6 +151,7 @@ class SignalCollector:
         self,
         keywords: Optional[List[str]] = None,
         limit_per_kw: int = _PER_KW_LIMIT,
+        since_days: Optional[int] = None,
         use_xhs: bool = True,
         use_douyin: bool = True,
         use_instagram: bool = True,
@@ -164,6 +165,12 @@ class SignalCollector:
         Each platform uses its own 5-keyword set targeting ~100 signals per
         platform per round. Pass `keywords` to override the union (used by
         XHS + Douyin; IG uses english hashtags regardless).
+
+        Args:
+            since_days: If set, drop signals whose publish_time is older
+                than N days. Signals with empty/unknown publish_time
+                (e.g. XHS search feeds) are kept regardless — they're
+                marked unknown, not aged-out.
 
         Returns deduplicated List[TrendSignal] sorted by engagement score.
         Falls back to mock data only if all real sources produce nothing.
@@ -234,12 +241,42 @@ class SignalCollector:
                 sources_used.append(f"mock({len(mock)})")
                 logger.info("Fallback to mock: %d signals", len(mock))
 
+        # Optional recency filter (publish_time known and within window)
+        if since_days is not None and all_signals:
+            before = len(all_signals)
+            all_signals = self._filter_by_age(all_signals, since_days)
+            dropped = before - len(all_signals)
+            if dropped:
+                logger.info("Recency filter (≤%dd): dropped %d/%d signals",
+                            since_days, dropped, before)
+
         if sources_used:
             logger.info("Sources: %s → %d total", ", ".join(sources_used), len(all_signals))
         else:
             logger.warning("No data sources available — returning empty")
 
         return self._dedup_and_sort(all_signals)
+
+    @staticmethod
+    def _filter_by_age(signals: List[TrendSignal], days: int) -> List[TrendSignal]:
+        """Drop signals older than `days`. Empty publish_time → kept (unknown ≠ old)."""
+        from datetime import datetime, timezone, timedelta
+        tz8 = timezone(timedelta(hours=8))
+        cutoff = datetime.now(tz8) - timedelta(days=days)
+        kept = []
+        for s in signals:
+            if not s.publish_time:
+                kept.append(s)            # unknown date → keep
+                continue
+            try:
+                pub = datetime.fromisoformat(s.publish_time)
+                if pub.tzinfo is None:
+                    pub = pub.replace(tzinfo=tz8)
+                if pub >= cutoff:
+                    kept.append(s)
+            except Exception:
+                kept.append(s)            # un-parseable → keep (don't silently drop)
+        return kept
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

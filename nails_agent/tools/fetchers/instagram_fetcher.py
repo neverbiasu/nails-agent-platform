@@ -65,6 +65,22 @@ def _parse_ig_edge(node: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
         caption = caption_edges[0]["node"]["text"] if caption_edges else node.get("accessibility_caption", "")
         hashtags = re.findall(r"#(\w+)", caption)
 
+        # Real publish time — IG ships it as a unix-seconds int under several keys
+        ts = (
+            node.get("taken_at_timestamp")
+            or node.get("taken_at")
+            or node.get("device_timestamp")
+            or 0
+        )
+        try:
+            ts_int = int(ts)
+            publish_iso = (
+                datetime.fromtimestamp(ts_int, tz=timezone.utc).astimezone(_TZ8).isoformat()
+                if ts_int > 0 else ""
+            )
+        except (ValueError, TypeError, OSError):
+            publish_iso = ""
+
         return TrendSignal(
             trend_id=_make_ig_id(shortcode or caption[:20]),
             platform="Instagram",
@@ -74,7 +90,7 @@ def _parse_ig_edge(node: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
             comments=node.get("edge_media_to_comment", {}).get("count", 0) or node.get("comment_count", 0),
             shares=0,
             collects=0,
-            publish_time=now_iso,
+            publish_time=publish_iso,
             captured_at=now_iso,
             style_tags=hashtags[:5],
             color_tags=[],

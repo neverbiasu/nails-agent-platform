@@ -149,7 +149,9 @@ def _feed_to_signal(feed: dict, keyword: str) -> Optional[TrendSignal]:
             comments=comments,
             shares=shares,
             collects=collects,
-            publish_time=now_iso,
+            # XHS search-feeds payload doesn't include publish time; leave
+            # empty (sentinel for "unknown" → neutral recency score).
+            publish_time="",
             captured_at=now_iso,
             **classified,
             image_urls=[cover_url] if cover_url else [],

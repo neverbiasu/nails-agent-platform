@@ -23,14 +23,23 @@ from nails_agent.models.schemas import (
 _TZ8 = timezone(timedelta(hours=8))
 
 
-def _recency_score(captured_at: str) -> float:
-    """More recent → higher score (0-100)."""
+def _recency_score(publish_time: str) -> float:
+    """
+    Real publish-time recency, 0-100.
+      • 0 days old   → 100
+      • 7 days old   → 0   (linear decay)
+      • >7 days old  → 0
+      • unknown ('') → 50  (neutral; common for XHS feeds)
+    """
+    if not publish_time:
+        return 50.0
     try:
-        cap = datetime.fromisoformat(captured_at)
-        if cap.tzinfo is None:
-            cap = cap.replace(tzinfo=_TZ8)
-        hours_old = (datetime.now(_TZ8) - cap).total_seconds() / 3600
-        # 0h → 100, 168h (1wk) → 0
+        pub = datetime.fromisoformat(publish_time)
+        if pub.tzinfo is None:
+            pub = pub.replace(tzinfo=_TZ8)
+        hours_old = (datetime.now(_TZ8) - pub).total_seconds() / 3600
+        if hours_old < 0:
+            return 100.0  # future-dated (clock skew); treat as fresh
         return max(0.0, round((1 - hours_old / 168) * 100, 1))
     except Exception:
         return 50.0
@@ -61,7 +70,7 @@ def evaluate(
 
     for sig in analysis.top_10:
         heat = sig.composite_score                        # already 0-100
-        recency = _recency_score(sig.captured_at)
+        recency = _recency_score(sig.publish_time)
         gap = _style_gap_score(sig, library)
         priority = round(heat * 0.5 + recency * 0.3 + gap * 0.2, 1)
 
