@@ -30,12 +30,14 @@ from nails_agent.models.schemas import (
 from nails_agent.memory.store import MemoryStore
 from nails_agent.tools.fetchers.signal_collector import SignalCollector, DEFAULT_NAIL_KEYWORDS
 from nails_agent.agents.workers import (
-    trend_analyst,
     value_evaluator,
     asset_generator,
     campaign_strategist,
     summarizer,
 )
+# Agent-powered workers (fall back to rule-based if ANTHROPIC_API_KEY missing)
+from nails_agent.agents.trend_agent import run_trend_scout
+from nails_agent.agents.campaign_agent import run_campaign_agent
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +50,17 @@ class PipelineOrchestrator:
         output_dir: str = "demo/output",
         keywords: Optional[List[str]] = None,
         collector: Optional[SignalCollector] = None,
+        use_agents: bool = True,   # use LLM-powered agents (falls back if API key absent)
     ):
         self.memory = memory or MemoryStore()
         self.data_dir = Path(data_dir)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.keywords = keywords or DEFAULT_NAIL_KEYWORDS
+        import os as _os
+        self.use_agents = use_agents and bool(
+            _os.environ.get("ANTHROPIC_API_KEY") or _os.environ.get("OPENROUTER_API_KEY")
+        )
         # SignalCollector: uses TikHub + XHS Skills + mock fallback
         self.collector = collector or SignalCollector(
             mock_data_path=str(self.data_dir / "trend_signals.json"),
@@ -93,10 +100,19 @@ class PipelineOrchestrator:
             # ── Step 1: Trend Analysis ─────────────────────────────────────
             emit("⏳ Step 1/4 趋势分析中…")
             state.step = 1
-            analysis = trend_analyst.analyse(signals)
+            if self.use_agents:
+                emit("🤖 TrendScoutAgent 启动（LLM 驱动）…")
+                analysis = run_trend_scout(
+                    focus_keywords=self.keywords[:5],
+                    progress_cb=emit,
+                )
+            else:
+                from nails_agent.agents.workers import trend_analyst
+                analysis = trend_analyst.analyse(signals)
             state.trend_analysis = analysis
             self._persist_trend_analysis(state.pipeline_id, analysis)
-            emit(f"✅ Step 1 完成 — top 关键词：{', '.join(s.keyword for s in analysis.top_10[:3])}")
+            top_tags = [st.tag for st in analysis.style_trends[:3]] or [s.keyword for s in analysis.top_10[:3]]
+            emit(f"✅ Step 1 完成 — top 风格：{', '.join(top_tags)}")
 
             # ── Step 2a + 2b in parallel ───────────────────────────────────
             emit("⏳ Step 2/4 价值评估 & 素材生成（并行）…")
@@ -116,7 +132,11 @@ class PipelineOrchestrator:
             # ── Step 3: Campaign Strategy ──────────────────────────────────
             emit("⏳ Step 3/4 运营策略制定中…")
             state.step = 3
-            campaign = campaign_strategist.strategise(value_result, asset_result)
+            if self.use_agents:
+                emit("🤖 CampaignAgent 启动（LLM 文案生成）…")
+                campaign = run_campaign_agent(analysis, max_cards=6, progress_cb=emit)
+            else:
+                campaign = campaign_strategist.strategise(value_result, asset_result)
             state.campaign_strategy = campaign
             self._persist_campaign(state.pipeline_id, campaign)
             p0_count = sum(1 for c in campaign.style_cards if c.schedule and c.schedule.priority == "P0")
@@ -156,9 +176,17 @@ class PipelineOrchestrator:
         state.status = "running"
         emit = progress_cb or (lambda msg: logger.info(msg))
         try:
-            signals = signals or self._load_signals()
             emit("⏳ Step 1 趋势分析中…")
-            analysis = trend_analyst.analyse(signals)
+            if self.use_agents:
+                emit("🤖 TrendScoutAgent 启动…")
+                analysis = run_trend_scout(
+                    focus_keywords=self.keywords[:5],
+                    progress_cb=emit,
+                )
+            else:
+                signals = signals or self._load_signals()
+                from nails_agent.agents.workers import trend_analyst
+                analysis = trend_analyst.analyse(signals)
             state.trend_analysis = analysis
             state.step = 1
             self._persist_trend_analysis(state.pipeline_id, analysis)

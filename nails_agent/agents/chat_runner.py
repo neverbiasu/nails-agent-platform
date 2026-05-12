@@ -40,6 +40,14 @@ from nails_agent.agents.chat_events import (
     make_progress,
     make_tool_call,
 )
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load API keys early so agent detection works
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path.home() / ".hermes" / ".env", override=False)
+
 from nails_agent.agents.workers import (
     asset_generator,
     campaign_strategist,
@@ -47,6 +55,15 @@ from nails_agent.agents.workers import (
     trend_analyst,
     value_evaluator,
 )
+
+
+def _check_agents_available() -> bool:
+    return bool(
+        os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
+    )
+
+
+_AGENTS_AVAILABLE = _check_agents_available()
 from nails_agent.memory.store import MemoryStore
 from nails_agent.models.schemas import (
     PipelineState,
@@ -80,12 +97,14 @@ class ChatPipelineRunner:
     def __init__(self,
                  collector: Optional[SignalCollector] = None,
                  memory: Optional[MemoryStore] = None,
-                 library_path: str = "demo/data/style_library.json"):
+                 library_path: str = "demo/data/style_library.json",
+                 use_agents: bool = True):
         self.collector = collector or SignalCollector(
             mock_data_path="demo/data/trend_signals.json",
         )
         self.memory = memory or MemoryStore()
         self.library_path = library_path
+        self.use_agents = use_agents and _AGENTS_AVAILABLE
 
     # ── Public entry ──────────────────────────────────────────────────────────
 
@@ -201,12 +220,18 @@ class ChatPipelineRunner:
         status = self.collector.source_status()
         ready = [k for k, v in status.items() if v]
         ready_str = ", ".join(ready) if ready else "仅 mock"
+        mode_line = (
+            "- **模式**: 🤖 **Agent 模式**（TrendScoutAgent + CampaignAgent，LLM 驱动）"
+            if self.use_agents else
+            "- **模式**: ⚙️ 规则模式（无 ANTHROPIC_API_KEY，回退到规则引擎）"
+        )
         plan_md = (
             "**📋 准备计划**\n\n"
             f"- **数据源就绪**: {ready_str}\n"
             f"- **关键词**: XHS {len(XHS_KEYWORDS)}, 抖音 {len(DOUYIN_KEYWORDS)}, "
             f"Instagram {len(IG_NAIL_TAGS)}\n"
             "- **目标**: 每平台 ≥100 条信号（去重后）\n"
+            f"{mode_line}\n"
             "- **流程**: 抓取 → 趋势分析 → 价值评估 + 素材生成 → 策略 → 报告\n"
             "- 每个关键节点会暂停等你确认。"
         )
@@ -295,15 +320,49 @@ class ChatPipelineRunner:
 
         ctx["signals"] = signals
 
-        # ── Step 1 inline: trend analysis ──────────────────────────────────
+        # ── Step 1: trend analysis (agent or rule-based) ──────────────────
         t0 = _now_ms()
-        analysis = trend_analyst.analyse(signals)
+        if self.use_agents:
+            events.append(make_tool_call(
+                tool="TrendScoutAgent.run",
+                args={"mode": "LLM", "platforms": ["xhs", "douyin"]},
+                status="ok",
+                duration_ms=0,
+                result_summary="agent启动中…",
+            ))
+            try:
+                from nails_agent.agents.trend_agent import run_trend_scout
+                agent_events: List[ChatEvent] = []
+
+                def _agent_prog(msg: str) -> None:
+                    agent_events.append(make_progress(
+                        phase="collecting",
+                        text=msg,
+                    ))
+
+                analysis = run_trend_scout(
+                    focus_keywords=kws,
+                    progress_cb=_agent_prog,
+                )
+                events.extend(agent_events)
+                # TrendScoutAgent already collected data; use top_10 as signal proxy
+                ctx["signals"] = analysis.top_10  # TrendSignal list from agent
+            except Exception as exc:
+                events.append(make_error(
+                    phase="collecting",
+                    message=f"TrendScoutAgent 失败，回退规则模式: {exc}",
+                    recoverable=True,
+                ))
+                analysis = trend_analyst.analyse(signals)
+        else:
+            analysis = trend_analyst.analyse(signals)
+
         events.append(make_tool_call(
-            tool="trend_analyst.analyse",
-            args={"signals_in": len(signals)},
+            tool="trend_analyst.analyse" if not self.use_agents else "TrendScoutAgent.analyse",
+            args={"signals_in": len(ctx["signals"])},
             status="ok",
             duration_ms=_now_ms() - t0,
-            result_summary=f"top {len(analysis.top_10)} trends · "
+            result_summary=f"top {len(analysis.style_trends or analysis.top_10)} styles · "
                            f"{len(analysis.patterns)} patterns",
         ))
         ctx["analysis"] = analysis
@@ -495,23 +554,45 @@ class ChatPipelineRunner:
 
     def _phase_strategy_building(self, store: Dict[str, Any]) -> List[ChatEvent]:
         ctx = store["context"]
+        analysis = ctx["analysis"]
         events: List[ChatEvent] = [
             make_phase_enter("strategy_building", "Step 3/4 运营策略", _elapsed(store)),
         ]
         t0 = _now_ms()
         try:
-            campaign = campaign_strategist.strategise(ctx["value_result"], ctx["asset_result"])
+            if self.use_agents:
+                events.append(make_tool_call(
+                    tool="CampaignAgent.run",
+                    args={"mode": "LLM", "styles": len(analysis.style_trends or [])},
+                    status="ok",
+                    duration_ms=0,
+                    result_summary="agent启动中…",
+                ))
+                from nails_agent.agents.campaign_agent import run_campaign_agent
+
+                agent_events: List[ChatEvent] = []
+
+                def _camp_prog(msg: str) -> None:
+                    agent_events.append(make_progress(
+                        phase="strategy_building",
+                        text=msg,
+                    ))
+
+                campaign = run_campaign_agent(analysis, max_cards=6, progress_cb=_camp_prog)
+                events.extend(agent_events)
+            else:
+                campaign = campaign_strategist.strategise(ctx["value_result"], ctx["asset_result"])
         except Exception as exc:
             events.append(make_error(
                 phase="strategy_building",
-                message=f"campaign_strategist 失败: {exc}",
+                message=f"策略生成失败: {exc}",
                 recoverable=True,
                 traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
             ))
             store["phase"] = "strategy_building"
             return events
         events.append(make_tool_call(
-            tool="campaign_strategist.strategise",
+            tool="CampaignAgent.run" if self.use_agents else "campaign_strategist.strategise",
             args={},
             status="ok",
             duration_ms=_now_ms() - t0,

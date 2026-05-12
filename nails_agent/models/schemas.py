@@ -87,9 +87,10 @@ class PlatformVariant(BaseModel):
 
 class PricingInfo(BaseModel):
     base_price: str
-    premium_price: str
-    promo_price: str
+    premium_price: str = ""
+    promo_price: str = ""
     premium_reason: str = ""
+    tier: str = "进阶款"   # 基础款 / 进阶款 / 高端款
 
 
 class StyleCardDraft(BaseModel):
@@ -128,6 +129,9 @@ class StyleCard(StyleCardDraft):
 
 class CampaignStrategyResult(BaseModel):
     style_cards: List[StyleCard]
+    executive_summary: str = ""
+    top_3_styles: List[str] = []
+    generated_at: str = ""
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
