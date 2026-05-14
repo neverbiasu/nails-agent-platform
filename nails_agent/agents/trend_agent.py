@@ -164,7 +164,7 @@ def _rule_based_fallback(since_days: int, progress_cb) -> "TrendAnalysisResult":
     from nails_agent.agents.workers.trend_analyst import analyse
 
     collector = SignalCollector()
-    signals = collector.collect(since_days=since_days, progress_cb=progress_cb)
+    signals = collector.collect(since_days=since_days)
     return analyse(signals)
 
 

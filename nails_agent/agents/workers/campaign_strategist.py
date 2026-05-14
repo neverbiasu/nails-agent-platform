@@ -109,3 +109,18 @@ def from_files(value_path: str, asset_path: str) -> CampaignStrategyResult:
     with open(asset_path, encoding="utf-8") as f:
         asset_result = AssetGenerationResult(**json.load(f))
     return strategise(value_result, asset_result)
+
+
+def generate_campaign(
+    trend_result: "TrendAnalysisResult",  # type: ignore[name-defined]
+    value_eval: ValueEvaluationResult,
+) -> CampaignStrategyResult:
+    """
+    Rule-based campaign generation from trend + value results only.
+    Used as fallback when asset_generator output is unavailable
+    (e.g. campaign_agent._rule_based_fallback).
+    """
+    from nails_agent.agents.workers.asset_generator import generate as gen_assets
+
+    asset_result = gen_assets(trend_result)
+    return strategise(value_eval, asset_result)
