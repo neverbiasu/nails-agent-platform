@@ -382,17 +382,10 @@ target-version = "py311"
 
 ## 8. Apple Silicon 注意事项
 
-`MediaPipe` 在 M 系列 Mac 上可能需要 Rosetta：
+`MediaPipe 0.10.14+` 已提供原生 `macosx_11_0_arm64` wheel，**无需 Rosetta**，直接安装即可：
 
 ```bash
-# 方法 1：通过 Rosetta
-arch -x86_64 pip install mediapipe
-
-# 方法 2：conda（推荐，稳定）
-conda create -n nails-consumer python=3.11
-conda activate nails-consumer
-pip install mediapipe
-pip install -e ".[consumer]"
+pip install -e ".[demo,consumer,dev]"
 ```
 
 如果 `POST /hand/analyze` 返回 `503`，检查 mediapipe 是否可 import：
@@ -400,6 +393,9 @@ pip install -e ".[consumer]"
 ```bash
 python -c "import mediapipe; print(mediapipe.__version__)"
 ```
+
+> **注意**：`mediapipe` 在 `[consumer]` extra 中，`pip install -e .`（不带 extra）不会安装它。
+> 务必使用 `.[demo,consumer,dev]` 完整安装。
 
 ---
 
