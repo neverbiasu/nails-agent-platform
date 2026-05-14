@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict, List
+
+if TYPE_CHECKING:
+    from nails_agent.models.schemas import TrendAnalysisResult
 
 from nails_agent.models.schemas import (
     ValueEvaluationResult,
