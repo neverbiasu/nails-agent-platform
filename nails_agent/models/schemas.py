@@ -1,6 +1,7 @@
 """
 All Pydantic schemas for the Nails Agent Platform.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,6 +13,7 @@ import uuid
 # ──────────────────────────────────────────────
 # Input / Raw Signal
 # ──────────────────────────────────────────────
+
 
 class TrendSignal(BaseModel):
     trend_id: str
@@ -37,21 +39,23 @@ class TrendSignal(BaseModel):
 # Step 1 Output: Trend Analysis
 # ──────────────────────────────────────────────
 
+
 class StyleTrend(BaseModel):
     """A style/color/material/scene tag aggregated across all signals."""
-    tag: str                                  # e.g. "猫眼", "法式", "粉色"
-    category: str                             # "style" | "color" | "material" | "scene"
-    post_count: int                           # how many posts carry this tag
-    total_engagement: int                     # sum of likes+collects+shares+comments
-    aggregated_score: float                   # 0-100, normalised across all tags
-    sample_caption: str = ""                  # one representative post caption
+
+    tag: str  # e.g. "猫眼", "法式", "粉色"
+    category: str  # "style" | "color" | "material" | "scene"
+    post_count: int  # how many posts carry this tag
+    total_engagement: int  # sum of likes+collects+shares+comments
+    aggregated_score: float  # 0-100, normalised across all tags
+    sample_caption: str = ""  # one representative post caption
 
 
 class TrendAnalysisResult(BaseModel):
-    top_10: List[TrendSignal]                 # individual posts (evidence)
-    style_trends: List[StyleTrend] = []       # aggregated tag trends (the real signal)
-    patterns: List[str]                       # e.g. "猫眼+暗黑 跨平台共振"
-    anomalies: List[str]                      # e.g. "冰透蓝 近48h增速 +320%"
+    top_10: List[TrendSignal]  # individual posts (evidence)
+    style_trends: List[StyleTrend] = []  # aggregated tag trends (the real signal)
+    patterns: List[str]  # e.g. "猫眼+暗黑 跨平台共振"
+    anomalies: List[str]  # e.g. "冰透蓝 近48h增速 +320%"
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -59,13 +63,14 @@ class TrendAnalysisResult(BaseModel):
 # Step 2a Output: Value Evaluation
 # ──────────────────────────────────────────────
 
+
 class MetricSnapshot(BaseModel):
     metric_id: str = Field(default_factory=lambda: f"M{uuid.uuid4().hex[:6].upper()}")
     trend_id: str
     keyword: str
-    external_heat_score: float    # 0-100, from composite_score normalisation
-    trend_growth_score: float     # 0-100, captured_at recency bonus
-    style_gap_score: float        # 0-100, how underserved in style_library
+    external_heat_score: float  # 0-100, from composite_score normalisation
+    trend_growth_score: float  # 0-100, captured_at recency bonus
+    style_gap_score: float  # 0-100, how underserved in style_library
     launch_priority_score: float  # weighted average → final score
     rank: int
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -80,6 +85,7 @@ class ValueEvaluationResult(BaseModel):
 # Step 2b Output: Asset / Style Cards Draft
 # ──────────────────────────────────────────────
 
+
 class PlatformVariant(BaseModel):
     caption: str
     hashtags: List[str]
@@ -90,7 +96,7 @@ class PricingInfo(BaseModel):
     premium_price: str = ""
     promo_price: str = ""
     premium_reason: str = ""
-    tier: str = "进阶款"   # 基础款 / 进阶款 / 高端款
+    tier: str = "进阶款"  # 基础款 / 进阶款 / 高端款
 
 
 class StyleCardDraft(BaseModel):
@@ -114,8 +120,9 @@ class AssetGenerationResult(BaseModel):
 # Step 3 Output: Campaign Strategy (final style cards)
 # ──────────────────────────────────────────────
 
+
 class PublishSchedule(BaseModel):
-    priority: str = "P1"                   # P0/P1/P2
+    priority: str = "P1"  # P0/P1/P2
     xiaohongshu_publish_at: str = ""
     douyin_publish_at: str = ""
     instagram_publish_at: str = ""
@@ -123,7 +130,7 @@ class PublishSchedule(BaseModel):
 
 class StyleCard(StyleCardDraft):
     style_id: str = ""
-    generation_status: str = "pending"     # pending/success/failed
+    generation_status: str = "pending"  # pending/success/failed
     schedule: Optional[PublishSchedule] = None
 
 
@@ -138,6 +145,7 @@ class CampaignStrategyResult(BaseModel):
 # ──────────────────────────────────────────────
 # Step 4 Output: Summary Report
 # ──────────────────────────────────────────────
+
 
 class ReportSection(BaseModel):
     title: str
@@ -159,9 +167,10 @@ class SummaryReport(BaseModel):
 # Pipeline State (in-memory L1 layer)
 # ──────────────────────────────────────────────
 
+
 class PipelineState(BaseModel):
     pipeline_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
-    status: str = "idle"   # idle / running / done / error
+    status: str = "idle"  # idle / running / done / error
     step: int = 0
     trend_analysis: Optional[TrendAnalysisResult] = None
     value_evaluation: Optional[ValueEvaluationResult] = None
@@ -178,20 +187,22 @@ class PipelineState(BaseModel):
 # Memory Store Entry (L2 layer)
 # ──────────────────────────────────────────────
 
+
 class MemoryEntry(BaseModel):
     entry_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     pipeline_id: str
-    produced_by: str           # worker name, e.g. "trend_analyst"
-    kind: str                  # "trend" | "metric" | "style_card" | "pattern" | "anomaly" | "summary"
-    key: str                   # e.g. trend_id or card_id
-    value: str                 # JSON-serialised content
-    tags: str = ""             # comma-separated for FTS
+    produced_by: str  # worker name, e.g. "trend_analyst"
+    kind: str  # "trend" | "metric" | "style_card" | "pattern" | "anomaly" | "summary"
+    key: str  # e.g. trend_id or card_id
+    value: str  # JSON-serialised content
+    tags: str = ""  # comma-separated for FTS
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 # ──────────────────────────────────────────────
 # Style Library Item
 # ──────────────────────────────────────────────
+
 
 class StyleLibraryItem(BaseModel):
     style_id: str
@@ -212,6 +223,7 @@ class StyleLibraryItem(BaseModel):
 # API request/response
 # ──────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
@@ -226,7 +238,7 @@ class ChatResponse(BaseModel):
 
 class TryOnRequest(BaseModel):
     style_id: str
-    hand_image_b64: Optional[str] = None   # base64 encoded hand image; None = use default
+    hand_image_b64: Optional[str] = None  # base64 encoded hand image; None = use default
 
 
 class TryOnResponse(BaseModel):
@@ -235,3 +247,225 @@ class TryOnResponse(BaseModel):
     fallback_url: Optional[str] = None
     error: Optional[str] = None
     duration_s: float = 0.0
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Consumer-side try-on (extracted from demo_v1)
+# ══════════════════════════════════════════════════════════════════════════
+
+# ── Hand & reference profiles ─────────────────────────────────────────────
+
+
+class HandProfile(BaseModel):
+    """Detected or reference hand profile (shape + skin tone + undertone)."""
+
+    hand_profile_id: str
+    owner_type: str  # "user_upload" | "nail_reference"
+    owner_id: str  # session image id or reference style id
+    session_id: Optional[str] = None
+    hand_shape: str = "unknown"  # slender_long | short_wide | square_palm | narrow_palm | unknown
+    hand_shape_confidence: float = 0.0
+    skin_tone: str = (
+        "unknown"  # cool_fair | warm_fair | natural | warm_yellow | wheat | deep | unknown
+    )
+    undertone: str = "unknown"  # warm | cool | neutral | unknown
+    skin_rgb: List[int] = []
+    skin_confidence: float = 0.0
+    undertone_confidence: float = 0.0
+    analysis_method: str = "mediapipe_opencv"  # or "manual_mock"
+    hand_metrics: Dict[str, Any] = {}
+    color_metrics: Dict[str, Any] = {}
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+# ── Nail visual feature & style v2 ────────────────────────────────────────
+
+
+class PaletteEntry(BaseModel):
+    color_family: str
+    color_name: str
+    rgb: List[int]
+    ratio: float
+
+
+class NailVisualFeature(BaseModel):
+    visual_feature_id: str
+    style_id: str
+    primary_color_family: str = "unknown"
+    primary_color_name: str = ""
+    primary_color_rgb: List[int] = []
+    dominant_palette: List[PaletteEntry] = []
+    color_temperature: str = "unknown"  # warm | cool | neutral | mixed | unknown
+    brightness_level: str = "unknown"  # light | medium | dark | unknown
+    saturation_level: str = "unknown"  # low | medium | high | unknown
+    contrast_level: str = "unknown"
+    color_vector: List[float] = []
+    extractor_version: str = "manual_mock_v1_1"
+    feature_confidence: float = 0.0
+    needs_manual_review: bool = False
+    feature_source: str = "manual_seed"
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: Optional[str] = None
+
+
+class NailStyleV2(BaseModel):
+    """Unified nail style — superset of V0 StyleLibraryItem + V1 nail_styles."""
+
+    style_id: str
+    title: str
+    image_url: str = ""
+    source_style_id: Optional[str] = None
+    source_platform: str = "internal"  # mock_social | xhs | douyin | internal | trend_generated
+    is_available_for_try_on: bool = True
+
+    # V1 linkage
+    reference_hand_profile_id: Optional[str] = None  # → HandProfile (owner_type=nail_reference)
+    visual_feature_id: Optional[str] = None  # → NailVisualFeature
+
+    # V0 tag fields (kept for backward compat with B-end pipeline)
+    style_tags: List[str] = []
+    color_tags: List[str] = []
+    material_tags: List[str] = []
+    nail_shape_tags: List[str] = []
+    scene_tags: List[str] = []
+    is_trend_generated: bool = False
+    created_from_trend_id: Optional[str] = None
+
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+# ── Session, recommendations, behavior, jobs ─────────────────────────────
+
+
+class TryOnSession(BaseModel):
+    session_id: str
+    current_user_label: str = "guest"
+    status: str = "active"  # active | closed
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    closed_at: Optional[str] = None
+    reset_reason: Optional[str] = None
+
+
+class UserHandImage(BaseModel):
+    user_hand_image_id: str
+    session_id: str
+    image_url: str
+    annotated_image_url: str = ""
+    image_width: int = 0
+    image_height: int = 0
+    uploaded_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    analysis_status: str = "success"
+    source_name: str = ""
+
+
+class RecommendationItem(BaseModel):
+    rank: int
+    style_id: str
+    total_score: float
+    hand_shape_score: float = 0.0
+    skin_tone_score: float = 0.0
+    visual_similarity_score: float = 0.0
+    color_preference_score: float = 0.0
+    behavior_boost_score: float = 0.0
+    repeat_penalty_score: float = 0.0
+    color_family_score: float = 0.0
+    palette_similarity_score: float = 0.0
+    color_temperature_score: float = 0.0
+    brightness_score: float = 0.0
+    saturation_score: float = 0.0
+    reason_tags: List[str] = []
+    reason_text: str = ""
+    primary_color_family: str = "unknown"
+    primary_color_name: str = ""
+    main_color_name: str = ""
+    color_temperature: str = "unknown"
+    brightness_level: str = "unknown"
+    saturation_level: str = "unknown"
+
+
+class RecommendationSnapshot(BaseModel):
+    snapshot_id: str
+    session_id: str
+    round_no: int  # 1 | 2
+    strategy: str  # reference_hand_match | session_visual_similarity_rerank
+    preference_id: Optional[str] = None
+    items: List[RecommendationItem] = []
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class BehaviorEvent(BaseModel):
+    event_id: str
+    session_id: str
+    style_id: str
+    event_type: str  # click | try_on_start | try_on_success
+    source_snapshot_id: Optional[str] = None
+    event_weight: int = 1
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class SessionPreferenceProfile(BaseModel):
+    preference_id: str
+    session_id: str
+    preferred_color_families: List[Dict[str, Any]] = []
+    preferred_primary_colors: List[Dict[str, Any]] = []
+    preferred_color_temperatures: List[Dict[str, Any]] = []
+    preferred_brightness_levels: List[Dict[str, Any]] = []
+    preferred_saturation_levels: List[Dict[str, Any]] = []
+    preference_color_vector: List[float] = []
+    positive_style_ids: List[str] = []
+    source_event_ids: List[str] = []
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class TryOnJob(BaseModel):
+    try_on_job_id: str
+    session_id: str
+    style_id: str
+    user_hand_image_id: str
+    nail_image_url: str = ""
+    status: str = "pending"  # pending | success | failed
+    comfyui_prompt_id: Optional[str] = None
+    request_payload: Dict[str, Any] = {}
+    result_image_url: Optional[str] = None
+    error_message: Optional[str] = None
+    duration_s: float = 0.0
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    completed_at: Optional[str] = None
+
+
+# ── Consumer API request/response ────────────────────────────────────────
+
+
+class HandAnalyzeResponse(BaseModel):
+    ok: bool
+    error: Optional[str] = None
+    hand_shape: str = "unknown"
+    hand_shape_label: str = ""
+    hand_shape_confidence: float = 0.0
+    skin_tone: str = "unknown"
+    skin_tone_label: str = ""
+    skin_confidence: float = 0.0
+    undertone: str = "unknown"
+    undertone_label: str = ""
+    undertone_confidence: float = 0.0
+    median_rgb: List[int] = []
+    metrics: Dict[str, Any] = {}
+    color_metrics: Dict[str, Any] = {}
+    annotated_image_b64: str = ""  # PNG, base64
+
+
+class SessionCreateResponse(BaseModel):
+    session: TryOnSession
+    user_image: UserHandImage
+    hand_profile: HandProfile
+
+
+class BehaviorEventRequest(BaseModel):
+    style_id: str
+    event_type: str  # click | try_on_start | try_on_success
+    source_snapshot_id: Optional[str] = None
+
+
+class ConsumerTryOnRequest(BaseModel):
+    style_id: str
+    source_snapshot_id: Optional[str] = None

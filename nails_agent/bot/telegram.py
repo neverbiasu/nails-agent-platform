@@ -15,16 +15,17 @@ Env vars required:
   NAILS_DATA_DIR       — path to data directory (default: demo/data)
   NAILS_OUTPUT_DIR     — path to output directory (default: demo/output)
 """
+
 from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
-from typing import Optional, Set
+from typing import Set
 
 logger = logging.getLogger(__name__)
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
+
 
 def _allowed_users() -> Set[int]:
     raw = os.environ.get("TELEGRAM_ALLOWED_USERS", "")
@@ -43,6 +44,7 @@ def _is_allowed(chat_id: int) -> bool:
 
 # ── Bot implementation using python-telegram-bot v20+ ────────────────────────
 
+
 def build_application():
     """Build and return a configured telegram Application."""
     try:
@@ -60,6 +62,7 @@ def build_application():
     def _make_orch():
         from nails_agent.memory.store import MemoryStore
         from nails_agent.agents.orchestrator import PipelineOrchestrator
+
         return PipelineOrchestrator(
             memory=MemoryStore(),
             data_dir=os.environ.get("NAILS_DATA_DIR", "demo/data"),
@@ -93,10 +96,7 @@ def build_application():
                 top3 = [s.keyword for s in state.trend_analysis.top_10[:3]]
                 patterns = state.trend_analysis.patterns[:2]
                 anomalies = state.trend_analysis.anomalies[:2]
-                reply = (
-                    f"✅ 趋势分析完成！\n\n"
-                    f"🏆 Top 3：{', '.join(top3)}\n\n"
-                )
+                reply = f"✅ 趋势分析完成！\n\n🏆 Top 3：{', '.join(top3)}\n\n"
                 if patterns:
                     reply += "📊 洞察：\n" + "\n".join(f"• {p}" for p in patterns) + "\n\n"
                 if anomalies:
@@ -124,6 +124,7 @@ def build_application():
 
         # Run synchronously (bot handlers are async, pipeline is sync)
         import asyncio
+
         try:
             orch = _make_orch()
             loop = asyncio.get_event_loop()
@@ -152,6 +153,7 @@ def build_application():
         if not _is_allowed(chat_id):
             return
         from nails_agent.memory.store import MemoryStore
+
         mem = MemoryStore()
         runs = mem.list_pipeline_runs(limit=5)
         if not runs:
@@ -220,6 +222,7 @@ def build_application():
 def run_polling():
     """Start the bot in polling mode (blocking)."""
     from dotenv import load_dotenv
+
     load_dotenv()
 
     logging.basicConfig(

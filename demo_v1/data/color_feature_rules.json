@@ -1,0 +1,106 @@
+[
+  {
+    "rule_id": "CFR_FAMILY_RED",
+    "target_type": "color_family",
+    "target_value": "red",
+    "display_name": "红色系",
+    "feature_rules": {"hsv_h": "0-18 or 345-360", "hsv_s": ">= 0.25"},
+    "priority": 30
+  },
+  {
+    "rule_id": "CFR_FAMILY_PINK",
+    "target_type": "color_family",
+    "target_value": "pink",
+    "display_name": "粉色系",
+    "feature_rules": {"hsv_h": "320-344 or 0-12", "hsv_s": ">= 0.12", "lab_l": ">= 45"},
+    "priority": 28
+  },
+  {
+    "rule_id": "CFR_FAMILY_NUDE",
+    "target_type": "color_family",
+    "target_value": "nude",
+    "display_name": "裸色系",
+    "feature_rules": {"hsv_h": "12-38", "hsv_s": "0.08-0.35", "lab_l": ">= 52"},
+    "priority": 24
+  },
+  {
+    "rule_id": "CFR_FAMILY_WHITE",
+    "target_type": "color_family",
+    "target_value": "white",
+    "display_name": "白色系",
+    "feature_rules": {"lab_l": ">= 82", "hsv_s": "<= 0.16"},
+    "priority": 26
+  },
+  {
+    "rule_id": "CFR_FAMILY_BLACK",
+    "target_type": "color_family",
+    "target_value": "black",
+    "display_name": "黑色系",
+    "feature_rules": {"lab_l": "<= 30"},
+    "priority": 32
+  },
+  {
+    "rule_id": "CFR_FAMILY_GREEN",
+    "target_type": "color_family",
+    "target_value": "green",
+    "display_name": "绿色系",
+    "feature_rules": {"hsv_h": "70-170", "hsv_s": ">= 0.15"},
+    "priority": 25
+  },
+  {
+    "rule_id": "CFR_FAMILY_GOLD_SILVER",
+    "target_type": "color_family",
+    "target_value": "gold_silver",
+    "display_name": "金银色系",
+    "feature_rules": {"hsv_s": "<= 0.24", "lab_l": "45-85", "metallic_hint": true},
+    "priority": 22
+  },
+  {
+    "rule_id": "CFR_TEMP_WARM",
+    "target_type": "color_temperature",
+    "target_value": "warm",
+    "display_name": "暖色",
+    "feature_rules": {"hsv_h": "0-60 or 320-360", "lab_b": ">= 8"},
+    "priority": 20
+  },
+  {
+    "rule_id": "CFR_TEMP_COOL",
+    "target_type": "color_temperature",
+    "target_value": "cool",
+    "display_name": "冷色",
+    "feature_rules": {"hsv_h": "70-260"},
+    "priority": 20
+  },
+  {
+    "rule_id": "CFR_LEVEL_LIGHT",
+    "target_type": "brightness_level",
+    "target_value": "light",
+    "display_name": "浅明度",
+    "feature_rules": {"lab_l": ">= 68"},
+    "priority": 10
+  },
+  {
+    "rule_id": "CFR_LEVEL_DARK",
+    "target_type": "brightness_level",
+    "target_value": "dark",
+    "display_name": "深明度",
+    "feature_rules": {"lab_l": "<= 42"},
+    "priority": 10
+  },
+  {
+    "rule_id": "CFR_SAT_HIGH",
+    "target_type": "saturation_level",
+    "target_value": "high",
+    "display_name": "高饱和",
+    "feature_rules": {"hsv_s": ">= 0.55"},
+    "priority": 10
+  },
+  {
+    "rule_id": "CFR_SAT_LOW",
+    "target_type": "saturation_level",
+    "target_value": "low",
+    "display_name": "低饱和",
+    "feature_rules": {"hsv_s": "<= 0.22"},
+    "priority": 10
+  }
+]

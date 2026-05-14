@@ -17,6 +17,7 @@ Usage:
     print(collector.source_status())
     signals = collector.collect()
 """
+
 from __future__ import annotations
 
 import json
@@ -35,12 +36,12 @@ logger = logging.getLogger(__name__)
 # Chinese terms work best on XHS (cover scene + intent + style).
 # Empirically XHS de-dups across keywords at ~40%, so 7 kw × 22 ≈ 154 → ~95-100 unique.
 XHS_KEYWORDS = [
-    "美甲",           # broadest seed
+    "美甲",  # broadest seed
     "美甲推荐",
     "夏日美甲",
     "显白美甲",
     "美甲灵感",
-    "法式美甲",        # style-specific, lifts unique-rate
+    "法式美甲",  # style-specific, lifts unique-rate
     "美甲教程",
 ]
 
@@ -103,24 +104,28 @@ class SignalCollector:
     def _get_xhs_mcp(self):
         if self._xhs_mcp is None:
             from nails_agent.tools.fetchers.xhs_mcp_fetcher import XHSMCPFetcher
+
             self._xhs_mcp = XHSMCPFetcher(base_url=self._xhs_mcp_url)
         return self._xhs_mcp
 
     def _get_douyin(self):
         if self._douyin is None:
             from nails_agent.tools.fetchers.douyin_cdp import DouyinCDPFetcher
+
             self._douyin = DouyinCDPFetcher(cdp_url=self._cdp_url)
         return self._douyin
 
     def _get_instagram(self):
         if self._instagram is None:
             from nails_agent.tools.fetchers.instagram_fetcher import InstagramFetcher
+
             self._instagram = InstagramFetcher(session_file=self._ig_session)
         return self._instagram
 
     def _get_tikhub(self):
         if self._tikhub is None:
             from nails_agent.tools.fetchers.tikhub_fetcher import TikHubFetcher
+
             self._tikhub = TikHubFetcher(api_key=self._tikhub_key)
         return self._tikhub
 
@@ -175,9 +180,9 @@ class SignalCollector:
         Returns deduplicated List[TrendSignal] sorted by engagement score.
         Falls back to mock data only if all real sources produce nothing.
         """
-        xhs_kws    = keywords or XHS_KEYWORDS
+        xhs_kws = keywords or XHS_KEYWORDS
         douyin_kws = keywords or DOUYIN_KEYWORDS
-        ig_tags    = IG_NAIL_TAGS  # english hashtags — not parametrised
+        ig_tags = IG_NAIL_TAGS  # english hashtags — not parametrised
 
         all_signals: List[TrendSignal] = []
         sources_used: List[str] = []
@@ -205,7 +210,9 @@ class SignalCollector:
                 logger.debug("Instagram: neither CDP nor instaloader available")
 
         if use_tikhub and self._tikhub_key:
-            tasks["tikhub"] = lambda: self._get_tikhub().fetch_all(xhs_kws, limit_per_kw=limit_per_kw)
+            tasks["tikhub"] = lambda: self._get_tikhub().fetch_all(
+                xhs_kws, limit_per_kw=limit_per_kw
+            )
 
         # Execute tasks
         # 5 keywords × scroll/source is slow: XHS ~50s, Douyin ~120s, IG ~150s.
@@ -247,8 +254,9 @@ class SignalCollector:
             all_signals = self._filter_by_age(all_signals, since_days)
             dropped = before - len(all_signals)
             if dropped:
-                logger.info("Recency filter (≤%dd): dropped %d/%d signals",
-                            since_days, dropped, before)
+                logger.info(
+                    "Recency filter (≤%dd): dropped %d/%d signals", since_days, dropped, before
+                )
 
         if sources_used:
             logger.info("Sources: %s → %d total", ", ".join(sources_used), len(all_signals))
@@ -261,12 +269,13 @@ class SignalCollector:
     def _filter_by_age(signals: List[TrendSignal], days: int) -> List[TrendSignal]:
         """Drop signals older than `days`. Empty publish_time → kept (unknown ≠ old)."""
         from datetime import datetime, timezone, timedelta
+
         tz8 = timezone(timedelta(hours=8))
         cutoff = datetime.now(tz8) - timedelta(days=days)
         kept = []
         for s in signals:
             if not s.publish_time:
-                kept.append(s)            # unknown date → keep
+                kept.append(s)  # unknown date → keep
                 continue
             try:
                 pub = datetime.fromisoformat(s.publish_time)
@@ -275,7 +284,7 @@ class SignalCollector:
                 if pub >= cutoff:
                     kept.append(s)
             except Exception:
-                kept.append(s)            # un-parseable → keep (don't silently drop)
+                kept.append(s)  # un-parseable → keep (don't silently drop)
         return kept
 
     # ── Helpers ───────────────────────────────────────────────────────────────

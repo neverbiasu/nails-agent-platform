@@ -14,13 +14,13 @@ Requires:
   - Chrome running with --remote-debugging-port=9222
   - Already logged in to xiaohongshu.com in that Chrome
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
 import re
-import time
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
@@ -33,10 +33,12 @@ logger = logging.getLogger(__name__)
 _TZ8 = timezone(timedelta(hours=8))
 _CDP_DEFAULT = "http://localhost:9222"
 
+
 # XHS search page URL (same as xhs-skills/urls.py)
 def _search_url(keyword: str) -> str:
     params = urlencode({"keyword": keyword, "source": "web_explore_feed"})
     return f"https://www.xiaohongshu.com/search_result?{params}"
+
 
 # JS to read current feeds from __INITIAL_STATE__
 _READ_FEEDS_JS = """
@@ -53,21 +55,88 @@ _READ_FEEDS_JS = """
 
 # Nail-related classification table for tag extraction from titles
 _NAIL_STYLE_WORDS = {
-    "猫眼", "法式", "渐变", "奶油", "3D", "贴片", "冰透", "暗黑", "日式", "韩式",
-    "极简", "波点", "格纹", "花朵", "蝴蝶", "爱心", "星月", "手绘", "光疗",
-    "玻璃", "镭射", "极光", "牛奶", "果冻", "奶酪", "蕾丝", "纯欲", "高级感",
-    "清冷", "气质", "显白", "闪粉", "珠光", "金箔", "锡箔", "拿铁", "莫奈",
-    "豹纹", "大理石", "珍珠", "水晶", "宝石", "钻石",
+    "猫眼",
+    "法式",
+    "渐变",
+    "奶油",
+    "3D",
+    "贴片",
+    "冰透",
+    "暗黑",
+    "日式",
+    "韩式",
+    "极简",
+    "波点",
+    "格纹",
+    "花朵",
+    "蝴蝶",
+    "爱心",
+    "星月",
+    "手绘",
+    "光疗",
+    "玻璃",
+    "镭射",
+    "极光",
+    "牛奶",
+    "果冻",
+    "奶酪",
+    "蕾丝",
+    "纯欲",
+    "高级感",
+    "清冷",
+    "气质",
+    "显白",
+    "闪粉",
+    "珠光",
+    "金箔",
+    "锡箔",
+    "拿铁",
+    "莫奈",
+    "豹纹",
+    "大理石",
+    "珍珠",
+    "水晶",
+    "宝石",
+    "钻石",
 }
 _NAIL_COLOR_WORDS = {
-    "白色", "黑色", "粉色", "红色", "蓝色", "紫色", "绿色", "裸色",
-    "香芋", "薄荷", "莫兰迪", "多巴胺", "奶茶", "杏色", "橘色", "黄色",
-    "咖色", "灰色", "玫瑰", "珊瑚",
+    "白色",
+    "黑色",
+    "粉色",
+    "红色",
+    "蓝色",
+    "紫色",
+    "绿色",
+    "裸色",
+    "香芋",
+    "薄荷",
+    "莫兰迪",
+    "多巴胺",
+    "奶茶",
+    "杏色",
+    "橘色",
+    "黄色",
+    "咖色",
+    "灰色",
+    "玫瑰",
+    "珊瑚",
 }
 _NAIL_MATERIAL_WORDS = {"甲油胶", "钻", "贝壳", "磁铁", "亮片", "锡箔", "金箔"}
 _NAIL_SCENE_WORDS = {
-    "新娘", "日常", "约会", "通勤", "夏日", "秋冬", "圣诞", "新年", "春天",
-    "夏天", "职场", "约会", "婚礼", "毕业",
+    "新娘",
+    "日常",
+    "约会",
+    "通勤",
+    "夏日",
+    "秋冬",
+    "圣诞",
+    "新年",
+    "春天",
+    "夏天",
+    "职场",
+    "约会",
+    "婚礼",
+    "毕业",
 }
 
 # Words that make "美甲" compound search terms worth trying
@@ -119,25 +188,16 @@ def _parse_feed_dict(item: Dict, keyword: str) -> Optional[TrendSignal]:
         note = item.get("noteCard") or item
         uid = item.get("id") or item.get("noteId") or item.get("note_id") or ""
         title = (
-            note.get("displayTitle") or note.get("display_title") or
-            item.get("displayTitle") or ""
+            note.get("displayTitle") or note.get("display_title") or item.get("displayTitle") or ""
         )
         desc = note.get("desc") or note.get("description") or ""
         caption = f"{title} {desc}".strip()[:200]
 
         interact = note.get("interactInfo") or note.get("interact_info") or {}
-        likes = _safe_int(
-            interact.get("likedCount") or interact.get("liked_count")
-        )
-        collects = _safe_int(
-            interact.get("collectedCount") or interact.get("collected_count")
-        )
-        comments = _safe_int(
-            interact.get("commentCount") or interact.get("comment_count")
-        )
-        shares = _safe_int(
-            interact.get("sharedCount") or interact.get("shared_count")
-        )
+        likes = _safe_int(interact.get("likedCount") or interact.get("liked_count"))
+        collects = _safe_int(interact.get("collectedCount") or interact.get("collected_count"))
+        comments = _safe_int(interact.get("commentCount") or interact.get("comment_count"))
+        shares = _safe_int(interact.get("sharedCount") or interact.get("shared_count"))
 
         classified = _classify_title(title + " " + desc)
 
@@ -184,6 +244,7 @@ class XHSCDPFetcher:
     def is_available(self) -> bool:
         try:
             import requests
+
             return requests.get(f"{self.cdp_url}/json/version", timeout=2).status_code == 200
         except Exception:
             return False
@@ -274,9 +335,7 @@ class XHSCDPFetcher:
                         page.evaluate("window.scrollBy(0, -200)")
                         page.wait_for_timeout(800)
 
-                logger.info(
-                    "XHS CDP: '%s' → %d signals (target=%d)", keyword, len(signals), target
-                )
+                logger.info("XHS CDP: '%s' → %d signals (target=%d)", keyword, len(signals), target)
                 return signals[:target]
 
             except Exception as e:
@@ -303,7 +362,10 @@ class XHSCDPFetcher:
 
             # Click the right sort option
             sort_map = {
-                "最新": 2, "最多点赞": 3, "最多评论": 4, "最多收藏": 5,
+                "最新": 2,
+                "最多点赞": 3,
+                "最多评论": 4,
+                "最多收藏": 5,
             }
             idx = sort_map.get(sort_by, 1)
             page.wait_for_timeout(300)
@@ -369,9 +431,7 @@ class XHSCDPFetcher:
             key=lambda s: s.likes + s.collects * 1.5 + s.shares * 2 + s.comments * 0.5,
             reverse=True,
         )
-        logger.info(
-            "XHS CDP Strategy A — total unique signals: %d", len(all_signals)
-        )
+        logger.info("XHS CDP Strategy A — total unique signals: %d", len(all_signals))
         return all_signals[:target_total]
 
     def _discover_sub_keywords(

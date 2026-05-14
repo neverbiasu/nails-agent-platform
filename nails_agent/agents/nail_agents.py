@@ -10,10 +10,10 @@ Two specialized agents + one orchestrator:
 
 Model: Qwen3-235B via ModelScope (primary) or Claude via OpenRouter (fallback)
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING
 
 from agents import Agent, handoff
 
@@ -99,9 +99,11 @@ _ORCHESTRATOR_SYSTEM = """\
 
 # ── Agent factory (lazy, cached) ───────────────────────────────────────────────
 
+
 @lru_cache(maxsize=1)
 def get_trend_scout_agent() -> Agent:
     from nails_agent.agents.agent_config import make_model
+
     return Agent(
         name="TrendScoutAgent",
         instructions=_TREND_SYSTEM,
@@ -113,6 +115,7 @@ def get_trend_scout_agent() -> Agent:
 @lru_cache(maxsize=1)
 def get_campaign_agent() -> Agent:
     from nails_agent.agents.agent_config import make_model
+
     return Agent(
         name="CampaignAgent",
         instructions=_CAMPAIGN_SYSTEM,
@@ -125,14 +128,15 @@ def get_campaign_agent() -> Agent:
 def get_orchestrator_agent() -> Agent:
     """Top-level agent with handoffs to specialists."""
     from nails_agent.agents.agent_config import make_model
-    trend_agent   = get_trend_scout_agent()
-    campaign_ag   = get_campaign_agent()
+
+    trend_agent = get_trend_scout_agent()
+    campaign_ag = get_campaign_agent()
     return Agent(
         name="NailsOrchestrator",
         instructions=_ORCHESTRATOR_SYSTEM,
         model=make_model(),
         handoffs=[
-            handoff(trend_agent,  tool_name_override="transfer_to_trend_scout"),
-            handoff(campaign_ag,  tool_name_override="transfer_to_campaign"),
+            handoff(trend_agent, tool_name_override="transfer_to_trend_scout"),
+            handoff(campaign_ag, tool_name_override="transfer_to_campaign"),
         ],
     )

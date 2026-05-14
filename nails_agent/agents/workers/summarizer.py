@@ -9,6 +9,7 @@ Tone goal:
 - Tables over flowery prose where numbers fit.
 - One short verdict line per section, not a paragraph.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
@@ -23,10 +24,10 @@ from nails_agent.models.schemas import (
 _TZ8 = timezone(timedelta(hours=8))
 
 _CATEGORY_LABEL = {
-    "style":    "款式",
-    "color":    "色系",
+    "style": "款式",
+    "color": "色系",
     "material": "材质",
-    "scene":    "场景",
+    "scene": "场景",
 }
 
 
@@ -108,8 +109,7 @@ def summarise(state: PipelineState) -> SummaryReport:
         p1 = [c for c in campaign.style_cards if c.schedule and c.schedule.priority == "P1"]
         p2 = [c for c in campaign.style_cards if c.schedule and c.schedule.priority == "P2"]
         lines = [
-            f"共 {len(campaign.style_cards)} 张卡片 · "
-            f"P0 {len(p0)} / P1 {len(p1)} / P2 {len(p2)}",
+            f"共 {len(campaign.style_cards)} 张卡片 · P0 {len(p0)} / P1 {len(p1)} / P2 {len(p2)}",
             "",
         ]
         if p0:

@@ -6,6 +6,7 @@ Output: AssetGenerationResult
 Generates style card drafts with platform-specific captions + pricing.
 Rule-based (no LLM call required for demo).
 """
+
 from __future__ import annotations
 
 import json
@@ -51,7 +52,13 @@ def _hashtags(sig: TrendSignal, platform: str) -> List[str]:
     elif platform == "douyin":
         base += ["#美甲教程", "#美甲分享"]
     elif platform == "instagram":
-        return [f"#{sig.keyword.replace(' ', '')}", "#nailart", "#nails", "#naildesign", "#nailinspo"]
+        return [
+            f"#{sig.keyword.replace(' ', '')}",
+            "#nailart",
+            "#nails",
+            "#naildesign",
+            "#nailinspo",
+        ]
     return base[:6]
 
 
@@ -59,17 +66,23 @@ def _pricing(sig: TrendSignal) -> PricingInfo:
     # Price tiers based on material complexity
     if any(t in sig.material_tags for t in ["3D雕花", "硬胶", "镶钻"]):
         return PricingInfo(
-            base_price="¥128", premium_price="¥268", promo_price="¥88",
-            premium_reason="高端材料+手工雕花+拍照服务"
+            base_price="¥128",
+            premium_price="¥268",
+            promo_price="¥88",
+            premium_reason="高端材料+手工雕花+拍照服务",
         )
     if any(t in sig.material_tags for t in ["猫眼", "磁铁石"]):
         return PricingInfo(
-            base_price="¥89", premium_price="¥168", promo_price="¥59",
-            premium_reason="限定磁铁石材料+延长设计+拍照服务"
+            base_price="¥89",
+            premium_price="¥168",
+            promo_price="¥59",
+            premium_reason="限定磁铁石材料+延长设计+拍照服务",
         )
     return PricingInfo(
-        base_price="¥69", premium_price="¥128", promo_price="¥49",
-        premium_reason="精工制作+拍照服务"
+        base_price="¥69",
+        premium_price="¥128",
+        promo_price="¥49",
+        premium_reason="精工制作+拍照服务",
     )
 
 
@@ -82,15 +95,9 @@ def generate(analysis: TrendAnalysisResult) -> AssetGenerationResult:
         keyword_en = sig.keyword  # simplified; no translation service needed
 
         tmpl_idx = i % len(_XHS_TEMPLATES)
-        xhs_caption = _XHS_TEMPLATES[tmpl_idx].format(
-            keyword=sig.keyword, tags_str=tags_str
-        )
-        dy_caption = _DOUYIN_TEMPLATES[tmpl_idx].format(
-            keyword=sig.keyword, tags_str=tags_str
-        )
-        ig_caption = _IG_TEMPLATES[tmpl_idx].format(
-            keyword_en=keyword_en, tags_en=tags_en
-        )
+        xhs_caption = _XHS_TEMPLATES[tmpl_idx].format(keyword=sig.keyword, tags_str=tags_str)
+        dy_caption = _DOUYIN_TEMPLATES[tmpl_idx].format(keyword=sig.keyword, tags_str=tags_str)
+        ig_caption = _IG_TEMPLATES[tmpl_idx].format(keyword_en=keyword_en, tags_en=tags_en)
 
         variants = {
             "xiaohongshu": PlatformVariant(

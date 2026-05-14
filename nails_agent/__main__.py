@@ -5,9 +5,9 @@ CLI entry:
   python -m nails_agent api      — start FastAPI server
   python -m nails_agent bot      — start Telegram bot
 """
+
 import argparse
 import logging
-import os
 import sys
 
 logging.basicConfig(
@@ -26,10 +26,12 @@ def main():
     args = parser.parse_args()
 
     from dotenv import load_dotenv
+
     load_dotenv()
 
     if args.command in ("run", "trend"):
         from nails_agent.agents.orchestrator import PipelineOrchestrator
+
         orch = PipelineOrchestrator(data_dir=args.data_dir, output_dir=args.output_dir)
         if args.command == "run":
             state = orch.run(progress_cb=print)
@@ -42,6 +44,7 @@ def main():
 
     elif args.command == "api":
         import uvicorn
+
         uvicorn.run(
             "nails_agent.api.main:app",
             host=args.host,
@@ -51,6 +54,7 @@ def main():
 
     elif args.command == "bot":
         from nails_agent.bot.telegram import run_polling
+
         run_polling()
 
 

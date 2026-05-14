@@ -7,12 +7,12 @@ The openai-agents SDK is built on the OpenAI client, so Anthropic is reached
 via OpenRouter's Claude proxy or a Responses-API-compatible proxy.
 ModelScope and OpenRouter both expose OpenAI-compatible endpoints.
 """
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
 from functools import lru_cache
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -22,16 +22,15 @@ load_dotenv(Path.home() / ".hermes" / ".env", override=False)
 
 # ── ModelScope constants ──────────────────────────────────────────────────────
 
-MODELSCOPE_BASE_URL  = os.environ.get("MODELSCOPE_BASE_URL",
-                                       "https://api-inference.modelscope.cn/v1")
-MODELSCOPE_MODEL     = os.environ.get("NAILS_MODELSCOPE_MODEL",
-                                       "Qwen/Qwen3-235B-A22B-Instruct-2507")
+MODELSCOPE_BASE_URL = os.environ.get(
+    "MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1"
+)
+MODELSCOPE_MODEL = os.environ.get("NAILS_MODELSCOPE_MODEL", "Qwen/Qwen3-235B-A22B-Instruct-2507")
 
 # ── OpenRouter constants ──────────────────────────────────────────────────────
 
-OPENROUTER_BASE_URL  = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL     = os.environ.get("NAILS_OPENROUTER_MODEL",
-                                       "anthropic/claude-sonnet-4-5")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = os.environ.get("NAILS_OPENROUTER_MODEL", "anthropic/claude-sonnet-4-5")
 
 
 def get_model_string() -> str:
@@ -51,8 +50,8 @@ def get_openai_client():
     """
     from agents import AsyncOpenAI
 
-    ms_key  = os.environ.get("MODELSCOPE_API_KEY")
-    or_key  = os.environ.get("OPENROUTER_API_KEY")
+    ms_key = os.environ.get("MODELSCOPE_API_KEY")
+    or_key = os.environ.get("OPENROUTER_API_KEY")
 
     if ms_key:
         return AsyncOpenAI(api_key=ms_key, base_url=MODELSCOPE_BASE_URL)
@@ -69,6 +68,7 @@ def get_openai_client():
 def make_model():
     """Return an OpenAIChatCompletionsModel for the active backend."""
     from agents import OpenAIChatCompletionsModel
+
     return OpenAIChatCompletionsModel(
         model=get_model_string(),
         openai_client=get_openai_client(),
@@ -76,6 +76,4 @@ def make_model():
 
 
 def is_available() -> bool:
-    return bool(
-        os.environ.get("MODELSCOPE_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
-    )
+    return bool(os.environ.get("MODELSCOPE_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))

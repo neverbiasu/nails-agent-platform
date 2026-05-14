@@ -12,11 +12,12 @@ State is held in PipelineState (L1 / in-memory).
 Completed step outputs are persisted to MemoryStore (L2 / SQLite+FTS5).
 After each pipeline, distill() promotes patterns to long-term insights.
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional
@@ -35,6 +36,7 @@ from nails_agent.agents.workers import (
     campaign_strategist,
     summarizer,
 )
+
 # Agent-powered workers (fall back to rule-based if ANTHROPIC_API_KEY missing)
 from nails_agent.agents.trend_agent import run_trend_scout
 from nails_agent.agents.campaign_agent import run_campaign_agent
@@ -50,7 +52,7 @@ class PipelineOrchestrator:
         output_dir: str = "demo/output",
         keywords: Optional[List[str]] = None,
         collector: Optional[SignalCollector] = None,
-        use_agents: bool = True,   # use LLM-powered agents (falls back if API key absent)
+        use_agents: bool = True,  # use LLM-powered agents (falls back if API key absent)
     ):
         self.memory = memory or MemoryStore()
         self.data_dir = Path(data_dir)
@@ -58,6 +60,7 @@ class PipelineOrchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.keywords = keywords or DEFAULT_NAIL_KEYWORDS
         import os as _os
+
         self.use_agents = use_agents and bool(
             _os.environ.get("ANTHROPIC_API_KEY") or _os.environ.get("OPENROUTER_API_KEY")
         )
@@ -108,10 +111,13 @@ class PipelineOrchestrator:
                 )
             else:
                 from nails_agent.agents.workers import trend_analyst
+
                 analysis = trend_analyst.analyse(signals)
             state.trend_analysis = analysis
             self._persist_trend_analysis(state.pipeline_id, analysis)
-            top_tags = [st.tag for st in analysis.style_trends[:3]] or [s.keyword for s in analysis.top_10[:3]]
+            top_tags = [st.tag for st in analysis.style_trends[:3]] or [
+                s.keyword for s in analysis.top_10[:3]
+            ]
             emit(f"✅ Step 1 完成 — top 风格：{', '.join(top_tags)}")
 
             # ── Step 2a + 2b in parallel ───────────────────────────────────
@@ -127,7 +133,9 @@ class PipelineOrchestrator:
             state.asset_generation = asset_result
             self._persist_value_evaluation(state.pipeline_id, value_result)
             self._persist_asset_generation(state.pipeline_id, asset_result)
-            emit(f"✅ Step 2 完成 — {len(value_result.snapshots)} 条评估, {len(asset_result.drafts)} 张卡片草稿")
+            emit(
+                f"✅ Step 2 完成 — {len(value_result.snapshots)} 条评估, {len(asset_result.drafts)} 张卡片草稿"
+            )
 
             # ── Step 3: Campaign Strategy ──────────────────────────────────
             emit("⏳ Step 3/4 运营策略制定中…")
@@ -139,8 +147,12 @@ class PipelineOrchestrator:
                 campaign = campaign_strategist.strategise(value_result, asset_result)
             state.campaign_strategy = campaign
             self._persist_campaign(state.pipeline_id, campaign)
-            p0_count = sum(1 for c in campaign.style_cards if c.schedule and c.schedule.priority == "P0")
-            emit(f"✅ Step 3 完成 — {len(campaign.style_cards)} 张策略卡片，P0 立即上线 {p0_count} 款")
+            p0_count = sum(
+                1 for c in campaign.style_cards if c.schedule and c.schedule.priority == "P0"
+            )
+            emit(
+                f"✅ Step 3 完成 — {len(campaign.style_cards)} 张策略卡片，P0 立即上线 {p0_count} 款"
+            )
 
             # ── Step 4: Summary Report ─────────────────────────────────────
             emit("⏳ Step 4/4 生成运营报告…")
@@ -149,7 +161,7 @@ class PipelineOrchestrator:
             state.report = report
             self._persist_report(state.pipeline_id, report)
             self._write_markdown(state.pipeline_id, report.markdown)
-            emit(f"✅ Step 4 完成 — 报告已生成")
+            emit("✅ Step 4 完成 — 报告已生成")
 
             # ── Distill long-term memory ───────────────────────────────────
             new_insights = self.memory.distill(state.pipeline_id)
@@ -186,11 +198,12 @@ class PipelineOrchestrator:
             else:
                 signals = signals or self._load_signals()
                 from nails_agent.agents.workers import trend_analyst
+
                 analysis = trend_analyst.analyse(signals)
             state.trend_analysis = analysis
             state.step = 1
             self._persist_trend_analysis(state.pipeline_id, analysis)
-            emit(f"✅ Step 1 完成")
+            emit("✅ Step 1 完成")
             state.status = "done"
         except Exception as exc:
             state.errors.append(str(exc))
@@ -222,10 +235,10 @@ class PipelineOrchestrator:
         """Write raw signals to output dir so the demo can show real data."""
         try:
             import json
+
             path = self.output_dir / "trend_signals.json"
             with open(path, "w", encoding="utf-8") as f:
-                json.dump([s.model_dump() for s in signals], f,
-                          ensure_ascii=False, indent=2)
+                json.dump([s.model_dump() for s in signals], f, ensure_ascii=False, indent=2)
             logger.debug("Persisted %d signals to %s", len(signals), path)
         except Exception as exc:
             logger.warning("Failed to persist signals: %s", exc)
@@ -235,24 +248,38 @@ class PipelineOrchestrator:
     def _persist_trend_analysis(self, pid: str, result) -> None:
         entries: List[MemoryEntry] = []
         for sig in result.top_10:
-            entries.append(MemoryEntry(
-                pipeline_id=pid,
-                produced_by="trend_analyst",
-                kind="trend",
-                key=sig.trend_id,
-                value=sig.model_dump_json(),
-                tags=f"{sig.keyword},{','.join(sig.style_tags)},{sig.platform}",
-            ))
+            entries.append(
+                MemoryEntry(
+                    pipeline_id=pid,
+                    produced_by="trend_analyst",
+                    kind="trend",
+                    key=sig.trend_id,
+                    value=sig.model_dump_json(),
+                    tags=f"{sig.keyword},{','.join(sig.style_tags)},{sig.platform}",
+                )
+            )
         for i, p in enumerate(result.patterns):
-            entries.append(MemoryEntry(
-                pipeline_id=pid, produced_by="trend_analyst",
-                kind="pattern", key=f"pattern_{i}", value=p, tags=p,
-            ))
+            entries.append(
+                MemoryEntry(
+                    pipeline_id=pid,
+                    produced_by="trend_analyst",
+                    kind="pattern",
+                    key=f"pattern_{i}",
+                    value=p,
+                    tags=p,
+                )
+            )
         for i, a in enumerate(result.anomalies):
-            entries.append(MemoryEntry(
-                pipeline_id=pid, produced_by="trend_analyst",
-                kind="anomaly", key=f"anomaly_{i}", value=a, tags=a,
-            ))
+            entries.append(
+                MemoryEntry(
+                    pipeline_id=pid,
+                    produced_by="trend_analyst",
+                    kind="anomaly",
+                    key=f"anomaly_{i}",
+                    value=a,
+                    tags=a,
+                )
+            )
         self.memory.save_many(entries)
         # Write JSON artifact
         out = self.output_dir / "trend_top10.json"
@@ -261,8 +288,10 @@ class PipelineOrchestrator:
     def _persist_value_evaluation(self, pid: str, result) -> None:
         entries = [
             MemoryEntry(
-                pipeline_id=pid, produced_by="value_evaluator",
-                kind="metric", key=s.metric_id,
+                pipeline_id=pid,
+                produced_by="value_evaluator",
+                kind="metric",
+                key=s.metric_id,
                 value=s.model_dump_json(),
                 tags=f"{s.keyword},priority:{s.launch_priority_score:.0f}",
             )
@@ -275,8 +304,10 @@ class PipelineOrchestrator:
     def _persist_asset_generation(self, pid: str, result) -> None:
         entries = [
             MemoryEntry(
-                pipeline_id=pid, produced_by="asset_generator",
-                kind="style_card_draft", key=d.card_id,
+                pipeline_id=pid,
+                produced_by="asset_generator",
+                kind="style_card_draft",
+                key=d.card_id,
                 value=d.model_dump_json(),
                 tags=f"{d.style_name},{','.join(d.style_tags)}",
             )
@@ -289,8 +320,10 @@ class PipelineOrchestrator:
     def _persist_campaign(self, pid: str, result) -> None:
         entries = [
             MemoryEntry(
-                pipeline_id=pid, produced_by="campaign_strategist",
-                kind="style_card", key=c.card_id,
+                pipeline_id=pid,
+                produced_by="campaign_strategist",
+                kind="style_card",
+                key=c.card_id,
                 value=c.model_dump_json(),
                 tags=f"{c.style_name},priority:{c.schedule.priority if c.schedule else 'P2'}",
             )
@@ -302,8 +335,10 @@ class PipelineOrchestrator:
 
     def _persist_report(self, pid: str, report) -> None:
         entry = MemoryEntry(
-            pipeline_id=pid, produced_by="summarizer",
-            kind="summary", key=pid,
+            pipeline_id=pid,
+            produced_by="summarizer",
+            kind="summary",
+            key=pid,
             value=report.model_dump_json(),
             tags=",".join(report.top_3_keywords),
         )
@@ -316,6 +351,4 @@ class PipelineOrchestrator:
         out.write_text(markdown, encoding="utf-8")
 
     def _save_state(self, state: PipelineState) -> None:
-        self.memory.save_pipeline_state(
-            state.pipeline_id, state.status, state.model_dump_json()
-        )
+        self.memory.save_pipeline_state(state.pipeline_id, state.status, state.model_dump_json())

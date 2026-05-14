@@ -68,28 +68,37 @@ def _tab_actions():
 
 
 def _tab_cards():
-    st.subheader("款式卡片")
+    st.subheader(f"款式卡片 · Top {10}")
     cards = load_style_cards()
-    cols = st.columns(min(3, len(cards)))
-    for i, card in enumerate(cards[:3]):
-        with cols[i % 3]:
-            priority = card["schedule"]["priority"]
-            st.markdown(f"**{PRIORITY_COLOR.get(priority, '')} {card['style_name']}**")
-            st.caption(f"优先级：{priority} | 评分：{card['launch_priority_score']:.1f}")
-            nail_img = STATIC_DIR / "nail_reference.jpg"
-            if nail_img.exists():
-                st.image(str(nail_img), use_container_width=True)
-            pv = card.get("platform_variants", {})
-            if pv.get("xiaohongshu"):
-                with st.expander("小红书文案"):
-                    st.write(pv["xiaohongshu"]["caption"])
-                    st.caption(" ".join(pv["xiaohongshu"].get("hashtags", [])))
-            pricing = card.get("pricing", {})
-            if pricing:
-                st.markdown(f"💰 基础价 **{pricing.get('base_price')}** | 溢价 {pricing.get('premium_price')} | 促销 {pricing.get('promo_price')}")
+    if not cards:
+        st.info("暂无款式卡片数据。")
+        return
 
-    if len(cards) > 3:
-        st.markdown(f"*还有 {len(cards) - 3} 个款式卡片（在完整流水线输出中）*")
+    # Show all cards in a 4-column grid
+    cols_per_row = 4
+    for i in range(0, len(cards), cols_per_row):
+        row_cards = cards[i:i + cols_per_row]
+        cols = st.columns(cols_per_row)
+        for col, card in zip(cols, row_cards):
+            with col:
+                priority = card["schedule"]["priority"]
+                st.markdown(f"**{PRIORITY_COLOR.get(priority, '')} {card['style_name']}**")
+                st.caption(f"优先级：{priority} | 评分：{card['launch_priority_score']:.1f}")
+                nail_img = STATIC_DIR / "nail_reference.jpg"
+                if nail_img.exists():
+                    st.image(str(nail_img), use_container_width=True)
+                pv = card.get("platform_variants", {})
+                if pv.get("xiaohongshu"):
+                    with st.expander("小红书文案"):
+                        st.write(pv["xiaohongshu"]["caption"])
+                        st.caption(" ".join(pv["xiaohongshu"].get("hashtags", [])))
+                pricing = card.get("pricing", {})
+                if pricing:
+                    st.markdown(
+                        f"💰 基础价 **¥{pricing.get('base_price')}** "
+                        f"| 溢价 ¥{pricing.get('premium_price')} "
+                        f"| 促销 ¥{pricing.get('promo_price')}"
+                    )
 
 
 def _tab_campaign():
@@ -118,10 +127,11 @@ def _tab_campaign():
     p2 = [c for c in cards if c["schedule"]["priority"] == "P2"]
 
     st.divider()
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("🔴 P0 立即上架", len(p0))
     col2.metric("🟡 P1 下周上架", len(p1))
     col3.metric("🟢 P2 待定", len(p2))
+    col4.metric("📊 本轮评估", len(cards))
 
     st.info("💡 建议：本周重点推广猫眼系列（猫眼美甲 + 冰透蓝猫眼），小红书+抖音联动发布，预计触达用户 15 万+")
 

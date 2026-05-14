@@ -20,7 +20,7 @@ def render():
     generated = sum(1 for c in cards if c["generation_status"] == "success")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("🔥 本周 Top 趋势", top["keyword"])
+    col1.metric("🔥 本周 Top 趋势", top.get("style_name", top.get("keyword", "—")))
     col2.metric("📊 上架优先评分", f"{top['launch_priority_score']:.1f} / 100")
     col3.metric("🎯 P0 款式", f"{p0_count} 款")
     col4.metric("🎨 已生成素材", f"{generated} / {len(cards)} 款")

@@ -1,0 +1,108 @@
+[
+  {
+    "skin_tone": "unknown",
+    "display_name": "未识别",
+    "description": "肤色采样区域过小或颜色波动过大。",
+    "feature_rules": {
+      "any_rules": [
+        {"sample_stability_lt": 0.35},
+        {"sample_size_lt": 30}
+      ]
+    },
+    "confidence_cap": 0.0,
+    "reason": "肤色采样区域不稳定",
+    "adjacent_tones": [],
+    "priority": 100
+  },
+  {
+    "skin_tone": "cool_fair",
+    "display_name": "冷白",
+    "description": "明度高，黄调较低，整体偏冷白。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_min": 78,
+      "lab_b_lt": 13
+    },
+    "confidence_cap": 0.90,
+    "reason": "高明度且黄调较低",
+    "adjacent_tones": ["warm_fair", "natural"],
+    "priority": 90
+  },
+  {
+    "skin_tone": "warm_fair",
+    "display_name": "暖白",
+    "description": "明度高，黄调或蜜桃调更明显。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_min": 76,
+      "lab_b_min": 13
+    },
+    "confidence_cap": 0.90,
+    "reason": "高明度且黄调较明显",
+    "adjacent_tones": ["cool_fair", "natural", "warm_yellow"],
+    "priority": 80
+  },
+  {
+    "skin_tone": "natural",
+    "display_name": "自然肤色",
+    "description": "中等明度，冷暖不强烈。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_min": 62,
+      "lab_l_lt": 76,
+      "lab_b_lt": 18
+    },
+    "confidence_cap": 0.88,
+    "reason": "中等明度，黄调不过强",
+    "adjacent_tones": ["cool_fair", "warm_fair", "warm_yellow", "wheat"],
+    "priority": 70
+  },
+  {
+    "skin_tone": "warm_yellow",
+    "display_name": "暖黄",
+    "description": "中等明度，黄调明显。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_min": 62,
+      "lab_l_lt": 76,
+      "lab_b_min": 18
+    },
+    "confidence_cap": 0.88,
+    "reason": "中等明度且黄调明显",
+    "adjacent_tones": ["warm_fair", "natural", "wheat"],
+    "priority": 60
+  },
+  {
+    "skin_tone": "wheat",
+    "display_name": "小麦色",
+    "description": "明度较低，接近健康小麦肤色。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_min": 48,
+      "lab_l_lt": 62
+    },
+    "confidence_cap": 0.86,
+    "reason": "明度较低，接近小麦肤色",
+    "adjacent_tones": ["natural", "warm_yellow", "deep"],
+    "priority": 50
+  },
+  {
+    "skin_tone": "deep",
+    "display_name": "深肤色",
+    "description": "明度低，肤色较深。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "lab_l_lt": 48
+    },
+    "confidence_cap": 0.86,
+    "reason": "明度较低，接近深肤色",
+    "adjacent_tones": ["wheat"],
+    "priority": 40
+  }
+]

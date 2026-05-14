@@ -1,0 +1,167 @@
+[
+  {
+    "style_id": "STYLE001",
+    "source_style_id": null,
+    "title": "酒红金线方格甲",
+    "image_url": "images/image001.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP001",
+    "visual_feature_id": "NVF001",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE002",
+    "source_style_id": null,
+    "title": "酒红鎏金短甲",
+    "image_url": "images/image002.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP002",
+    "visual_feature_id": "NVF002",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE003",
+    "source_style_id": null,
+    "title": "黑曜星芒裸透甲",
+    "image_url": "images/image003.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP003",
+    "visual_feature_id": "NVF003",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE004",
+    "source_style_id": null,
+    "title": "香槟碎钻长甲",
+    "image_url": "images/image004.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP004",
+    "visual_feature_id": "NVF004",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE005",
+    "source_style_id": null,
+    "title": "裸透蝴蝶钻饰甲",
+    "image_url": "images/image005.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP005",
+    "visual_feature_id": "NVF005",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE006",
+    "source_style_id": null,
+    "title": "橄榄奶油拼色甲",
+    "image_url": "images/image006.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP006",
+    "visual_feature_id": "NVF006",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE007",
+    "source_style_id": null,
+    "title": "奶油裸粉极简甲",
+    "image_url": "images/image007.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP007",
+    "visual_feature_id": "NVF007",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE008",
+    "source_style_id": null,
+    "title": "黑玫瑰复古短甲",
+    "image_url": "images/image008.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP008",
+    "visual_feature_id": "NVF008",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE009",
+    "source_style_id": null,
+    "title": "银灰猫眼通勤甲",
+    "image_url": "images/image009.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP009",
+    "visual_feature_id": "NVF009",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE010",
+    "source_style_id": null,
+    "title": "奶白波点短甲",
+    "image_url": "images/image010.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP010",
+    "visual_feature_id": "NVF010",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE011",
+    "source_style_id": null,
+    "title": "黑钻银边冷感甲",
+    "image_url": "images/image011.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP011",
+    "visual_feature_id": "NVF011",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE012",
+    "source_style_id": null,
+    "title": "裸粉蝴蝶结甜美甲",
+    "image_url": "images/image012.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP012",
+    "visual_feature_id": "NVF012",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE013",
+    "source_style_id": null,
+    "title": "黑绿花园手绘甲",
+    "image_url": "images/image013.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP013",
+    "visual_feature_id": "NVF013",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE014",
+    "source_style_id": null,
+    "title": "春日彩绘裸粉甲",
+    "image_url": "images/image014.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP014",
+    "visual_feature_id": "NVF014",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  },
+  {
+    "style_id": "STYLE015",
+    "source_style_id": null,
+    "title": "玫红花漾亮片甲",
+    "image_url": "images/image015.png",
+    "source_platform": "mock_social",
+    "reference_hand_profile_id": "RHP015",
+    "visual_feature_id": "NVF015",
+    "is_available_for_try_on": true,
+    "created_at": "2026-05-11T16:00:00+08:00"
+  }
+]

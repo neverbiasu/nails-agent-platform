@@ -14,11 +14,11 @@ Usage (integrated):
     agent = HermesNailsAgent()
     reply = agent.chat("找最新猫眼美甲趋势")
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ class HermesNailsAgent:
         """Outer Hermes wrapper (optional). Falls back to orchestrator."""
         try:
             from run_agent import AIAgent  # hermes-agent
+
             hermes = AIAgent(
                 model="anthropic/claude-sonnet-4-5",
                 quiet_mode=self._quiet,
@@ -106,6 +107,7 @@ class HermesNailsAgent:
         event_type: 'text' | 'tool' | 'done'
         """
         from nails_agent.agents.agent_config import is_available
+
         if not is_available():
             yield ("text", "❌ 未配置 API key")
             yield ("done", "")
@@ -113,7 +115,6 @@ class HermesNailsAgent:
 
         async def _astream():
             from agents import Runner
-            from agents.stream_events import RunItemStreamEvent
             from nails_agent.agents.nail_agents import get_orchestrator_agent
 
             agent = get_orchestrator_agent()

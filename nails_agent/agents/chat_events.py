@@ -8,6 +8,7 @@ three interaction points (start / choose / interrupt).
 All models are frozen to discourage accidental mutation after emission —
 events are append-only history.
 """
+
 from __future__ import annotations
 
 import time
@@ -22,11 +23,11 @@ Phase = Literal[
     "idle",
     "plan_review",
     "collecting",
-    "trends_review",      # checkpoint after Step 1
+    "trends_review",  # checkpoint after Step 1
     "evaluating",
-    "eval_review",        # checkpoint after Step 2 (value eval + asset gen)
+    "eval_review",  # checkpoint after Step 2 (value eval + asset gen)
     "strategy_building",
-    "strategy_review",    # checkpoint after Step 3 (campaign strategy)
+    "strategy_review",  # checkpoint after Step 3 (campaign strategy)
     "reporting",
     "done",
     "interrupted",
@@ -36,12 +37,13 @@ Phase = Literal[
 
 # ── Phase-output sub-models (discriminated by `kind`) ─────────────────────────
 
+
 class TableOutput(BaseModel):
     model_config = ConfigDict(frozen=True)
     kind: Literal["table"] = "table"
     title: str
     columns: List[str]
-    rows: List[List]                       # row-major
+    rows: List[List]  # row-major
 
 
 class ChartOutput(BaseModel):
@@ -51,7 +53,7 @@ class ChartOutput(BaseModel):
     chart_type: Literal["bar", "radar", "line", "pie"]
     x: List
     y: List
-    labels: Optional[List[str]] = None     # used by radar/pie
+    labels: Optional[List[str]] = None  # used by radar/pie
 
 
 class MarkdownOutput(BaseModel):
@@ -65,7 +67,7 @@ class GalleryItem(BaseModel):
     model_config = ConfigDict(frozen=True)
     url: str
     caption: str
-    badge: Optional[str] = None            # e.g. "P0", "热度 92"
+    badge: Optional[str] = None  # e.g. "P0", "热度 92"
 
 
 class ImageGalleryOutput(BaseModel):
@@ -80,13 +82,14 @@ PhaseOutputData = Union[TableOutput, ChartOutput, MarkdownOutput, ImageGalleryOu
 
 # ── Checkpoint sub-models ─────────────────────────────────────────────────────
 
+
 class FormField(BaseModel):
     model_config = ConfigDict(frozen=True)
     name: str
     label: str
     type: Literal["text", "number", "multiselect"]
     default: Optional[Union[str, int, List[str]]] = None
-    options: Optional[List[str]] = None    # for multiselect
+    options: Optional[List[str]] = None  # for multiselect
 
 
 class CheckpointChoice(BaseModel):
@@ -94,11 +97,12 @@ class CheckpointChoice(BaseModel):
     id: str
     label: str
     style: Literal["primary", "secondary", "danger"] = "secondary"
-    priority: Literal["P0", "P1"] = "P0"   # only P1 may be auto-approved
+    priority: Literal["P0", "P1"] = "P0"  # only P1 may be auto-approved
     form: Optional[List[FormField]] = None
 
 
 # ── Top-level payload variants ────────────────────────────────────────────────
+
 
 class MessagePayload(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -109,7 +113,7 @@ class MessagePayload(BaseModel):
 
 class ToolCallPayload(BaseModel):
     model_config = ConfigDict(frozen=True)
-    tool: str                              # e.g. "xhs-mcp.search_feeds"
+    tool: str  # e.g. "xhs-mcp.search_feeds"
     args: dict
     status: Literal["running", "ok", "error"]
     duration_ms: Optional[int] = None
@@ -143,7 +147,7 @@ class ProgressPayload(BaseModel):
     model_config = ConfigDict(frozen=True)
     phase: Phase
     text: str
-    fraction: Optional[float] = None       # 0-1
+    fraction: Optional[float] = None  # 0-1
 
 
 class ErrorPayload(BaseModel):
@@ -151,7 +155,7 @@ class ErrorPayload(BaseModel):
     phase: Phase
     message: str
     recoverable: bool = True
-    traceback: Optional[str] = None        # dev-only display
+    traceback: Optional[str] = None  # dev-only display
 
 
 EventPayload = Union[
@@ -180,6 +184,7 @@ EventType = Literal[
 
 class ChatEvent(BaseModel):
     """Append-only history element. UI replays these on every rerun."""
+
     model_config = ConfigDict(frozen=True)
 
     type: EventType
@@ -190,8 +195,10 @@ class ChatEvent(BaseModel):
 
 # ── User → runner actions ─────────────────────────────────────────────────────
 
+
 class UserAction(BaseModel):
     """The only three things the UI can tell the runner."""
+
     model_config = ConfigDict(frozen=True)
 
     type: Literal["start", "choose", "interrupt"]
@@ -204,6 +211,7 @@ class UserAction(BaseModel):
 # ── Convenience constructors ──────────────────────────────────────────────────
 # These keep the runner code readable — instead of nesting two model
 # constructors per event, the runner just calls `make_message(...)`.
+
 
 def make_message(role: str, text: str, icon: Optional[str] = None) -> ChatEvent:
     return ChatEvent(
@@ -223,7 +231,9 @@ def make_tool_call(
     return ChatEvent(
         type="tool_call",
         payload=ToolCallPayload(
-            tool=tool, args=args, status=status,
+            tool=tool,
+            args=args,
+            status=status,
             duration_ms=duration_ms,
             result_summary=result_summary,
             result_data=result_data,
@@ -255,7 +265,9 @@ def make_checkpoint(
     return ChatEvent(
         type="checkpoint",
         payload=CheckpointPayload(
-            phase=phase, prompt=prompt, choices=choices,
+            phase=phase,
+            prompt=prompt,
+            choices=choices,
             auto_approve_after_s=auto_approve_after_s,
             auto_approve_choice_id=auto_approve_choice_id,
         ),
@@ -278,7 +290,9 @@ def make_error(
     return ChatEvent(
         type="error",
         payload=ErrorPayload(
-            phase=phase, message=message,
-            recoverable=recoverable, traceback=traceback_text,
+            phase=phase,
+            message=message,
+            recoverable=recoverable,
+            traceback=traceback_text,
         ),
     )

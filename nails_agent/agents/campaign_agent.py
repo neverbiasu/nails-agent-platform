@@ -4,13 +4,17 @@ CampaignAgent — public API for running campaign strategy generation.
 Uses openai-agents SDK Runner with CampaignAgent (Qwen3 / Claude via OpenRouter).
 Falls back to rule-based if no API key is available.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 from datetime import datetime, timezone, timedelta, date
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
+
+if TYPE_CHECKING:
+    from nails_agent.models.schemas import CampaignStrategyResult, StyleCard, TrendAnalysisResult
 
 logger = logging.getLogger(__name__)
 _TZ8 = timezone(timedelta(hours=8))
@@ -102,9 +106,7 @@ def _format_trend_context(result: "TrendAnalysisResult", max_styles: int) -> str
 
 
 def _load_campaign_result(output_dir: str, progress_cb) -> "CampaignStrategyResult":
-    from nails_agent.models.schemas import (
-        CampaignStrategyResult, StyleCard, PlatformVariant, PricingInfo, PublishSchedule
-    )
+    from nails_agent.models.schemas import CampaignStrategyResult
 
     campaign_path = os.path.join(output_dir, "campaign.json")
     try:

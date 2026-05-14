@@ -12,6 +12,7 @@ Mode B (fallback): instaloader — public hashtag scraping without login.
 
 Priority: CDP → instaloader → empty
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -30,9 +31,14 @@ logger = logging.getLogger(__name__)
 _TZ8 = timezone(timedelta(hours=8))
 
 _NAIL_HASHTAGS_EN = [
-    "nailart", "cateyenails", "frenchnails",
-    "3dnailart", "gradientnails", "gelnails",
-    "naildesign", "acrylicnails",
+    "nailart",
+    "cateyenails",
+    "frenchnails",
+    "3dnailart",
+    "gradientnails",
+    "gelnails",
+    "naildesign",
+    "acrylicnails",
 ]
 
 _HASHTAG_TO_KW = {
@@ -62,7 +68,11 @@ def _parse_ig_edge(node: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
         now_iso = datetime.now(_TZ8).isoformat()
         shortcode = node.get("shortcode") or node.get("code") or ""
         caption_edges = node.get("edge_media_to_caption", {}).get("edges", [])
-        caption = caption_edges[0]["node"]["text"] if caption_edges else node.get("accessibility_caption", "")
+        caption = (
+            caption_edges[0]["node"]["text"]
+            if caption_edges
+            else node.get("accessibility_caption", "")
+        )
         hashtags = re.findall(r"#(\w+)", caption)
 
         # Real publish time — IG ships it as a unix-seconds int under several keys
@@ -76,7 +86,8 @@ def _parse_ig_edge(node: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
             ts_int = int(ts)
             publish_iso = (
                 datetime.fromtimestamp(ts_int, tz=timezone.utc).astimezone(_TZ8).isoformat()
-                if ts_int > 0 else ""
+                if ts_int > 0
+                else ""
             )
         except (ValueError, TypeError, OSError):
             publish_iso = ""
@@ -87,7 +98,8 @@ def _parse_ig_edge(node: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
             keyword=keyword,
             caption=caption[:200],
             likes=node.get("edge_liked_by", {}).get("count", 0) or node.get("like_count", 0),
-            comments=node.get("edge_media_to_comment", {}).get("count", 0) or node.get("comment_count", 0),
+            comments=node.get("edge_media_to_comment", {}).get("count", 0)
+            or node.get("comment_count", 0),
             shares=0,
             collects=0,
             publish_time=publish_iso,
@@ -124,6 +136,7 @@ class InstagramFetcher:
     def _cdp_available(self) -> bool:
         try:
             import requests
+
             r = requests.get(f"{self.cdp_url}/json/version", timeout=2)
             return r.status_code == 200
         except Exception:
@@ -134,6 +147,7 @@ class InstagramFetcher:
             return False
         try:
             import instaloader  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -170,7 +184,9 @@ class InstagramFetcher:
 
                 def _on_response(resp):
                     url = resp.url
-                    if ("graphql" in url or "api/v1/tags" in url or "sections" in url) and resp.status == 200:
+                    if (
+                        "graphql" in url or "api/v1/tags" in url or "sections" in url
+                    ) and resp.status == 200:
                         try:
                             captured_data.append(resp.json())
                         except Exception:
@@ -217,9 +233,13 @@ class InstagramFetcher:
                         page.wait_for_timeout(800)
                         signals = self._parse_ig_data(captured_data, keyword, limit_per_tag)
                         scrolls += 1
-                        logger.debug("Instagram CDP: #%s scroll %d → %d signals", tag, scrolls, len(signals))
+                        logger.debug(
+                            "Instagram CDP: #%s scroll %d → %d signals", tag, scrolls, len(signals)
+                        )
 
-                    logger.info("Instagram CDP: #%s → %d signals (%d scrolls)", tag, len(signals), scrolls)
+                    logger.info(
+                        "Instagram CDP: #%s → %d signals (%d scrolls)", tag, len(signals), scrolls
+                    )
                     all_signals.extend(signals[:limit_per_tag])
 
                 except Exception as e:
@@ -242,14 +262,19 @@ class InstagramFetcher:
         signals = []
         for body in captured:
             edges = (
-                body.get("data", {}).get("hashtag", {}).get("edge_hashtag_to_top_posts", {}).get("edges") or
-                body.get("data", {}).get("recent", {}).get("sections") or
-                body.get("sections") or
-                []
+                body.get("data", {})
+                .get("hashtag", {})
+                .get("edge_hashtag_to_top_posts", {})
+                .get("edges")
+                or body.get("data", {}).get("recent", {}).get("sections")
+                or body.get("sections")
+                or []
             )
             nodes = []
             for e in edges:
-                node = e.get("node") or e.get("layout_content", {}).get("medias", [{}])[0].get("media")
+                node = e.get("node") or e.get("layout_content", {}).get("medias", [{}])[0].get(
+                    "media"
+                )
                 if node:
                     nodes.append(node)
 
@@ -271,9 +296,13 @@ class InstagramFetcher:
         import time as _time
 
         L = instaloader.Instaloader(
-            download_videos=False, download_video_thumbnails=False,
-            download_geotags=False, download_comments=False,
-            save_metadata=False, compress_json=False, quiet=True,
+            download_videos=False,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            compress_json=False,
+            quiet=True,
         )
         try:
             username = os.path.basename(self.session_file).replace(".session", "")
@@ -293,19 +322,24 @@ class InstagramFetcher:
                     if j >= limit_per_tag:
                         break
                     caption = post.caption or ""
-                    all_signals.append(TrendSignal(
-                        trend_id=_make_ig_id(post.shortcode),
-                        platform="Instagram",
-                        keyword=keyword,
-                        caption=caption[:200],
-                        likes=post.likes,
-                        comments=post.comments,
-                        shares=0, collects=0,
-                        publish_time=post.date_utc.astimezone(_TZ8).isoformat(),
-                        captured_at=now_iso,
-                        style_tags=list(post.caption_hashtags)[:5],
-                        color_tags=[], material_tags=[], scene_tags=[],
-                    ))
+                    all_signals.append(
+                        TrendSignal(
+                            trend_id=_make_ig_id(post.shortcode),
+                            platform="Instagram",
+                            keyword=keyword,
+                            caption=caption[:200],
+                            likes=post.likes,
+                            comments=post.comments,
+                            shares=0,
+                            collects=0,
+                            publish_time=post.date_utc.astimezone(_TZ8).isoformat(),
+                            captured_at=now_iso,
+                            style_tags=list(post.caption_hashtags)[:5],
+                            color_tags=[],
+                            material_tags=[],
+                            scene_tags=[],
+                        )
+                    )
                 logger.info("Instagram instaloader: #%s → %d signals", tag, j + 1)
                 if i < len(hashtags) - 1:
                     _time.sleep(2.0)

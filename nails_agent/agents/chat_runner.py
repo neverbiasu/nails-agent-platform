@@ -17,11 +17,16 @@ State machine:
     any phase ─interrupt─▶ interrupted (graceful, between tool calls)
     any phase ─exception─▶ error (recoverable)
 """
+
 from __future__ import annotations
 
+import os
 import time
 import traceback
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
 
 from nails_agent.agents.chat_events import (
     ChatEvent,
@@ -40,14 +45,6 @@ from nails_agent.agents.chat_events import (
     make_progress,
     make_tool_call,
 )
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Load API keys early so agent detection works
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
-load_dotenv(Path.home() / ".hermes" / ".env", override=False)
-
 from nails_agent.agents.workers import (
     asset_generator,
     campaign_strategist,
@@ -55,15 +52,6 @@ from nails_agent.agents.workers import (
     trend_analyst,
     value_evaluator,
 )
-
-
-def _check_agents_available() -> bool:
-    return bool(
-        os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
-    )
-
-
-_AGENTS_AVAILABLE = _check_agents_available()
 from nails_agent.memory.store import MemoryStore
 from nails_agent.models.schemas import (
     PipelineState,
@@ -76,6 +64,17 @@ from nails_agent.tools.fetchers.signal_collector import (
     SignalCollector,
     XHS_KEYWORDS,
 )
+
+# Load API keys early so agent detection works
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path.home() / ".hermes" / ".env", override=False)
+
+
+def _check_agents_available() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+
+
+_AGENTS_AVAILABLE = _check_agents_available()
 
 
 def _now_ms() -> int:
@@ -94,11 +93,13 @@ class ChatPipelineRunner:
       • pending_interrupt — read in long loops; honoured at safe breakpoints
     """
 
-    def __init__(self,
-                 collector: Optional[SignalCollector] = None,
-                 memory: Optional[MemoryStore] = None,
-                 library_path: str = "demo/data/style_library.json",
-                 use_agents: bool = True):
+    def __init__(
+        self,
+        collector: Optional[SignalCollector] = None,
+        memory: Optional[MemoryStore] = None,
+        library_path: str = "demo/data/style_library.json",
+        use_agents: bool = True,
+    ):
         self.collector = collector or SignalCollector(
             mock_data_path="demo/data/trend_signals.json",
         )
@@ -118,20 +119,21 @@ class ChatPipelineRunner:
             if action.type == "interrupt":
                 return self._handle_interrupt(action, store)
         except Exception as exc:
-            return [make_error(
-                phase=store.get("phase", "idle"),
-                message=f"Unexpected runner error: {exc}",
-                recoverable=False,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            )]
+            return [
+                make_error(
+                    phase=store.get("phase", "idle"),
+                    message=f"Unexpected runner error: {exc}",
+                    recoverable=False,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            ]
         return []
 
     # ── Action handlers ───────────────────────────────────────────────────────
 
     def _handle_start(self, action: UserAction, store: Dict[str, Any]) -> List[ChatEvent]:
         if store["phase"] != "idle":
-            return [make_message("assistant",
-                                  "⚠️ 当前已经在跑了，先完成或中止再开始新会话。")]
+            return [make_message("assistant", "⚠️ 当前已经在跑了，先完成或中止再开始新会话。")]
         store["start_time"] = time.time()
         payload = action.payload or {}
         text = payload.get("text", "").strip() or "开始今日分析"
@@ -222,8 +224,8 @@ class ChatPipelineRunner:
         ready_str = ", ".join(ready) if ready else "仅 mock"
         mode_line = (
             "- **模式**: 🤖 **Agent 模式**（TrendScoutAgent + CampaignAgent，LLM 驱动）"
-            if self.use_agents else
-            "- **模式**: ⚙️ 规则模式（无 ANTHROPIC_API_KEY，回退到规则引擎）"
+            if self.use_agents
+            else "- **模式**: ⚙️ 规则模式（无 ANTHROPIC_API_KEY，回退到规则引擎）"
         )
         plan_md = (
             "**📋 准备计划**\n\n"
@@ -243,7 +245,7 @@ class ChatPipelineRunner:
                 "确认开始？",
                 choices=[
                     CheckpointChoice(id="approve", label="✓ 开始", style="primary", priority="P0"),
-                    CheckpointChoice(id="abort",   label="✗ 取消", style="danger",  priority="P0"),
+                    CheckpointChoice(id="abort", label="✗ 取消", style="danger", priority="P0"),
                 ],
             ),
         ]
@@ -262,13 +264,15 @@ class ChatPipelineRunner:
         status = self.collector.source_status()
         for src in ("xhs", "douyin_cdp", "instagram"):
             available = status.get(src, False)
-            events.append(make_tool_call(
-                tool=f"signal_collector.probe[{src}]",
-                args={},
-                status="ok" if available else "error",
-                duration_ms=0,
-                result_summary="ready" if available else "unavailable",
-            ))
+            events.append(
+                make_tool_call(
+                    tool=f"signal_collector.probe[{src}]",
+                    args={},
+                    status="ok" if available else "error",
+                    duration_ms=0,
+                    result_summary="ready" if available else "unavailable",
+                )
+            )
 
         # Graceful interrupt check
         if store.get("pending_interrupt"):
@@ -286,12 +290,14 @@ class ChatPipelineRunner:
                 use_tikhub=False,
             )
         except Exception as exc:
-            events.append(make_error(
-                phase="collecting",
-                message=f"采集失败: {exc}",
-                recoverable=True,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            ))
+            events.append(
+                make_error(
+                    phase="collecting",
+                    message=f"采集失败: {exc}",
+                    recoverable=True,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            )
             store["phase"] = "collecting"
             return events
         dt = _now_ms() - t0
@@ -300,21 +306,25 @@ class ChatPipelineRunner:
         for s in signals:
             by_platform[s.platform] = by_platform.get(s.platform, 0) + 1
 
-        events.append(make_tool_call(
-            tool="SignalCollector.collect",
-            args={"keywords": kws or "platform-defaults"},
-            status="ok",
-            duration_ms=dt,
-            result_summary=f"{len(signals)} signals · " +
-                           " / ".join(f"{p} {n}" for p, n in by_platform.items()),
-        ))
+        events.append(
+            make_tool_call(
+                tool="SignalCollector.collect",
+                args={"keywords": kws or "platform-defaults"},
+                status="ok",
+                duration_ms=dt,
+                result_summary=f"{len(signals)} signals · "
+                + " / ".join(f"{p} {n}" for p, n in by_platform.items()),
+            )
+        )
 
         if not signals:
-            events.append(make_error(
-                phase="collecting",
-                message="未采集到任何信号。检查数据源是否就绪。",
-                recoverable=True,
-            ))
+            events.append(
+                make_error(
+                    phase="collecting",
+                    message="未采集到任何信号。检查数据源是否就绪。",
+                    recoverable=True,
+                )
+            )
             store["phase"] = "collecting"
             return events
 
@@ -323,22 +333,27 @@ class ChatPipelineRunner:
         # ── Step 1: trend analysis (agent or rule-based) ──────────────────
         t0 = _now_ms()
         if self.use_agents:
-            events.append(make_tool_call(
-                tool="TrendScoutAgent.run",
-                args={"mode": "LLM", "platforms": ["xhs", "douyin"]},
-                status="ok",
-                duration_ms=0,
-                result_summary="agent启动中…",
-            ))
+            events.append(
+                make_tool_call(
+                    tool="TrendScoutAgent.run",
+                    args={"mode": "LLM", "platforms": ["xhs", "douyin"]},
+                    status="ok",
+                    duration_ms=0,
+                    result_summary="agent启动中…",
+                )
+            )
             try:
                 from nails_agent.agents.trend_agent import run_trend_scout
+
                 agent_events: List[ChatEvent] = []
 
                 def _agent_prog(msg: str) -> None:
-                    agent_events.append(make_progress(
-                        phase="collecting",
-                        text=msg,
-                    ))
+                    agent_events.append(
+                        make_progress(
+                            phase="collecting",
+                            text=msg,
+                        )
+                    )
 
                 analysis = run_trend_scout(
                     focus_keywords=kws,
@@ -348,23 +363,27 @@ class ChatPipelineRunner:
                 # TrendScoutAgent already collected data; use top_10 as signal proxy
                 ctx["signals"] = analysis.top_10  # TrendSignal list from agent
             except Exception as exc:
-                events.append(make_error(
-                    phase="collecting",
-                    message=f"TrendScoutAgent 失败，回退规则模式: {exc}",
-                    recoverable=True,
-                ))
+                events.append(
+                    make_error(
+                        phase="collecting",
+                        message=f"TrendScoutAgent 失败，回退规则模式: {exc}",
+                        recoverable=True,
+                    )
+                )
                 analysis = trend_analyst.analyse(signals)
         else:
             analysis = trend_analyst.analyse(signals)
 
-        events.append(make_tool_call(
-            tool="trend_analyst.analyse" if not self.use_agents else "TrendScoutAgent.analyse",
-            args={"signals_in": len(ctx["signals"])},
-            status="ok",
-            duration_ms=_now_ms() - t0,
-            result_summary=f"top {len(analysis.style_trends or analysis.top_10)} styles · "
-                           f"{len(analysis.patterns)} patterns",
-        ))
+        events.append(
+            make_tool_call(
+                tool="trend_analyst.analyse" if not self.use_agents else "TrendScoutAgent.analyse",
+                args={"signals_in": len(ctx["signals"])},
+                status="ok",
+                duration_ms=_now_ms() - t0,
+                result_summary=f"top {len(analysis.style_trends or analysis.top_10)} styles · "
+                f"{len(analysis.patterns)} patterns",
+            )
+        )
         ctx["analysis"] = analysis
         return events
 
@@ -380,43 +399,60 @@ class ChatPipelineRunner:
 
         # ① Aggregated style trends (the actual hot styles)
         if analysis.style_trends:
-            cat_label = {"style": "款式", "color": "色系",
-                         "material": "材质", "scene": "场景"}
-            events.append(make_phase_output(
+            cat_label = {"style": "款式", "color": "色系", "material": "材质", "scene": "场景"}
+            events.append(
+                make_phase_output(
+                    "trends_review",
+                    TableOutput(
+                        title="款式热度（按聚合互动量）",
+                        columns=["标签", "类别", "出现帖数", "累计互动", "相对热度"],
+                        rows=[
+                            [
+                                t.tag,
+                                cat_label.get(t.category, t.category),
+                                t.post_count,
+                                t.total_engagement,
+                                round(t.aggregated_score, 1),
+                            ]
+                            for t in analysis.style_trends[:10]
+                        ],
+                    ),
+                )
+            )
+            events.append(
+                make_phase_output(
+                    "trends_review",
+                    ChartOutput(
+                        title="Top 风格相对热度",
+                        chart_type="bar",
+                        x=[round(t.aggregated_score, 1) for t in analysis.style_trends[:10]],
+                        y=[t.tag for t in analysis.style_trends[:10]],
+                    ),
+                )
+            )
+
+        # ② Top-10 individual posts enriched with matched library styles
+        library = self._load_library()
+        events.append(
+            make_phase_output(
                 "trends_review",
                 TableOutput(
-                    title="款式热度（按聚合互动量）",
-                    columns=["标签", "类别", "出现帖数", "累计互动", "相对热度"],
+                    title="参考样本 · Top 10 高互动帖（含匹配款式）",
+                    columns=["排名", "关键词", "匹配款式", "平台", "点赞", "综合分"],
                     rows=[
-                        [t.tag, cat_label.get(t.category, t.category),
-                         t.post_count, t.total_engagement,
-                         round(t.aggregated_score, 1)]
-                        for t in analysis.style_trends[:10]
+                        [
+                            i + 1,
+                            s.keyword,
+                            _matched_style_names(s, library),
+                            s.platform,
+                            s.likes,
+                            round(s.composite_score, 1),
+                        ]
+                        for i, s in enumerate(top)
                     ],
                 ),
-            ))
-            events.append(make_phase_output(
-                "trends_review",
-                ChartOutput(
-                    title="Top 风格相对热度",
-                    chart_type="bar",
-                    x=[round(t.aggregated_score, 1) for t in analysis.style_trends[:10]],
-                    y=[t.tag for t in analysis.style_trends[:10]],
-                ),
-            ))
-
-        # ② Supporting evidence: top-10 individual posts
-        events.append(make_phase_output(
-            "trends_review",
-            TableOutput(
-                title="参考样本 · Top 10 高互动帖",
-                columns=["排名", "来源关键词", "平台", "点赞", "综合分"],
-                rows=[
-                    [i + 1, s.keyword, s.platform, s.likes, round(s.composite_score, 1)]
-                    for i, s in enumerate(top)
-                ],
-            ),
-        ))
+            )
+        )
 
         # ③ Patterns + anomalies
         if analysis.patterns or analysis.anomalies:
@@ -430,28 +466,44 @@ class ChatPipelineRunner:
                 md_lines.append("**近 48h 突发热度**")
                 for a in analysis.anomalies[:5]:
                     md_lines.append(f"- {a}")
-            events.append(make_phase_output(
-                "trends_review",
-                MarkdownOutput(title="组合 & 异常", body="\n".join(md_lines)),
-            ))
+            events.append(
+                make_phase_output(
+                    "trends_review",
+                    MarkdownOutput(title="组合 & 异常", body="\n".join(md_lines)),
+                )
+            )
 
         kw_default = ",".join(XHS_KEYWORDS[:5])
         from nails_agent.agents.chat_events import FormField
-        events.append(make_checkpoint(
-            "trends_review",
-            f"已采集 {len(signals)} 条 / 分析出 {len(analysis.top_10)} 个 top 趋势。是否继续到价值评估？",
-            choices=[
-                CheckpointChoice(id="approve", label="✓ 继续到价值评估", style="primary", priority="P1"),
-                CheckpointChoice(
-                    id="adjust_kws", label="🔧 调关键词重抓", style="secondary", priority="P0",
-                    form=[FormField(name="keywords", label="关键词（逗号分隔）",
-                                     type="text", default=kw_default)],
-                ),
-                CheckpointChoice(id="abort", label="✗ 结束", style="danger", priority="P0"),
-            ],
-            auto_approve_after_s=15,
-            auto_approve_choice_id="approve",
-        ))
+
+        events.append(
+            make_checkpoint(
+                "trends_review",
+                f"已采集 {len(signals)} 条 / 分析出 {len(analysis.top_10)} 个 top 趋势。是否继续到价值评估？",
+                choices=[
+                    CheckpointChoice(
+                        id="approve", label="✓ 继续到价值评估", style="primary", priority="P1"
+                    ),
+                    CheckpointChoice(
+                        id="adjust_kws",
+                        label="🔧 调关键词重抓",
+                        style="secondary",
+                        priority="P0",
+                        form=[
+                            FormField(
+                                name="keywords",
+                                label="关键词（逗号分隔）",
+                                type="text",
+                                default=kw_default,
+                            )
+                        ],
+                    ),
+                    CheckpointChoice(id="abort", label="✗ 结束", style="danger", priority="P0"),
+                ],
+                auto_approve_after_s=15,
+                auto_approve_choice_id="approve",
+            )
+        )
         return events
 
     def _phase_evaluating(self, store: Dict[str, Any]) -> List[ChatEvent]:
@@ -468,21 +520,25 @@ class ChatPipelineRunner:
         try:
             value_result = value_evaluator.evaluate(analysis, library)
         except Exception as exc:
-            events.append(make_error(
-                phase="evaluating",
-                message=f"value_evaluator 失败: {exc}",
-                recoverable=True,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            ))
+            events.append(
+                make_error(
+                    phase="evaluating",
+                    message=f"value_evaluator 失败: {exc}",
+                    recoverable=True,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            )
             store["phase"] = "evaluating"
             return events
-        events.append(make_tool_call(
-            tool="value_evaluator.evaluate",
-            args={"top_trends": len(analysis.top_10), "library_items": len(library)},
-            status="ok",
-            duration_ms=_now_ms() - t0,
-            result_summary=f"{len(value_result.snapshots)} metric snapshots",
-        ))
+        events.append(
+            make_tool_call(
+                tool="value_evaluator.evaluate",
+                args={"top_trends": len(analysis.top_10), "library_items": len(library)},
+                status="ok",
+                duration_ms=_now_ms() - t0,
+                result_summary=f"{len(value_result.snapshots)} metric snapshots",
+            )
+        )
         ctx["value_result"] = value_result
 
         # asset_generator
@@ -490,66 +546,94 @@ class ChatPipelineRunner:
         try:
             asset_result = asset_generator.generate(analysis)
         except Exception as exc:
-            events.append(make_error(
-                phase="evaluating",
-                message=f"asset_generator 失败: {exc}",
-                recoverable=True,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            ))
+            events.append(
+                make_error(
+                    phase="evaluating",
+                    message=f"asset_generator 失败: {exc}",
+                    recoverable=True,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            )
             store["phase"] = "evaluating"
             return events
-        events.append(make_tool_call(
-            tool="asset_generator.generate",
-            args={"top_trends": len(analysis.top_10)},
-            status="ok",
-            duration_ms=_now_ms() - t0,
-            result_summary=f"{len(asset_result.drafts)} card drafts",
-        ))
+        events.append(
+            make_tool_call(
+                tool="asset_generator.generate",
+                args={"top_trends": len(analysis.top_10)},
+                status="ok",
+                duration_ms=_now_ms() - t0,
+                result_summary=f"{len(asset_result.drafts)} card drafts",
+            )
+        )
         ctx["asset_result"] = asset_result
 
-        # Inline outputs
-        events.append(make_phase_output(
-            "evaluating",
-            TableOutput(
-                title="价值评估 Top 10",
-                columns=["排名", "关键词", "外部热度", "新鲜度", "风格缺口", "优先级"],
-                rows=[
-                    [s.rank, s.keyword, s.external_heat_score, s.trend_growth_score,
-                     s.style_gap_score, s.launch_priority_score]
-                    for s in value_result.snapshots
-                ],
-            ),
-        ))
-        events.append(make_phase_output(
-            "evaluating",
-            ImageGalleryOutput(
-                title="素材卡片草稿",
-                items=[
-                    GalleryItem(
-                        url=d.image_url or "",
-                        caption=d.style_name,
-                        badge=f"P · {d.launch_priority_score:.0f}",
-                    )
-                    for d in asset_result.drafts[:8]
-                ],
-            ),
-        ))
+        # Inline outputs — show all snapshots (up to 10) with style names
+        events.append(
+            make_phase_output(
+                "evaluating",
+                TableOutput(
+                    title=f"价值评估 Top {len(value_result.snapshots)}",
+                    columns=[
+                        "排名",
+                        "款式名称",
+                        "趋势关键词",
+                        "外部热度",
+                        "新鲜度",
+                        "风格缺口",
+                        "优先级",
+                    ],
+                    rows=[
+                        [
+                            s.rank,
+                            _trend_to_style_name(s.keyword, library),
+                            s.keyword,
+                            s.external_heat_score,
+                            s.trend_growth_score,
+                            s.style_gap_score,
+                            s.launch_priority_score,
+                        ]
+                        for s in value_result.snapshots
+                    ],
+                ),
+            )
+        )
+        events.append(
+            make_phase_output(
+                "evaluating",
+                ImageGalleryOutput(
+                    title="素材卡片草稿",
+                    items=[
+                        GalleryItem(
+                            url=d.image_url or "",
+                            caption=d.style_name,
+                            badge=f"P · {d.launch_priority_score:.0f}",
+                        )
+                        for d in asset_result.drafts[:8]
+                    ],
+                ),
+            )
+        )
 
         # ── Checkpoint: eval_review (Step 2 → Step 3) ─────────────────────
         events.append(make_phase_enter("eval_review", "价值评估结果", _elapsed(store)))
-        top_priority = (value_result.snapshots[0].launch_priority_score
-                        if value_result.snapshots else 0)
-        events.append(make_checkpoint(
-            "eval_review",
-            f"已生成 {len(value_result.snapshots)} 条评估 + {len(asset_result.drafts)} 张素材卡片。"
-            f"最高优先级 {top_priority:.1f}。是否继续到策略制定？",
-            choices=[
-                CheckpointChoice(id="approve", label="✓ 继续到策略制定", style="primary", priority="P1"),
-                CheckpointChoice(id="abort",   label="✗ 结束",          style="danger",  priority="P0"),
-            ],
-            auto_approve_after_s=15,
-            auto_approve_choice_id="approve",
-        ))
+        top_priority = (
+            value_result.snapshots[0].launch_priority_score if value_result.snapshots else 0
+        )
+        events.append(
+            make_checkpoint(
+                "eval_review",
+                f"已生成 {len(value_result.snapshots)} 条评估 + {len(asset_result.drafts)} 张素材卡片。"
+                f"最高优先级 {top_priority:.1f}。是否继续到策略制定？",
+                choices=[
+                    CheckpointChoice(
+                        id="approve", label="✓ 继续到策略制定", style="primary", priority="P1"
+                    ),
+                    CheckpointChoice(id="abort", label="✗ 结束", style="danger", priority="P0"),
+                ],
+                auto_approve_after_s=15,
+                auto_approve_choice_id="approve",
+            )
+        )
         return events
 
     def _phase_strategy_building(self, store: Dict[str, Any]) -> List[ChatEvent]:
@@ -561,43 +645,51 @@ class ChatPipelineRunner:
         t0 = _now_ms()
         try:
             if self.use_agents:
-                events.append(make_tool_call(
-                    tool="CampaignAgent.run",
-                    args={"mode": "LLM", "styles": len(analysis.style_trends or [])},
-                    status="ok",
-                    duration_ms=0,
-                    result_summary="agent启动中…",
-                ))
+                events.append(
+                    make_tool_call(
+                        tool="CampaignAgent.run",
+                        args={"mode": "LLM", "styles": len(analysis.style_trends or [])},
+                        status="ok",
+                        duration_ms=0,
+                        result_summary="agent启动中…",
+                    )
+                )
                 from nails_agent.agents.campaign_agent import run_campaign_agent
 
                 agent_events: List[ChatEvent] = []
 
                 def _camp_prog(msg: str) -> None:
-                    agent_events.append(make_progress(
-                        phase="strategy_building",
-                        text=msg,
-                    ))
+                    agent_events.append(
+                        make_progress(
+                            phase="strategy_building",
+                            text=msg,
+                        )
+                    )
 
                 campaign = run_campaign_agent(analysis, max_cards=6, progress_cb=_camp_prog)
                 events.extend(agent_events)
             else:
                 campaign = campaign_strategist.strategise(ctx["value_result"], ctx["asset_result"])
         except Exception as exc:
-            events.append(make_error(
-                phase="strategy_building",
-                message=f"策略生成失败: {exc}",
-                recoverable=True,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            ))
+            events.append(
+                make_error(
+                    phase="strategy_building",
+                    message=f"策略生成失败: {exc}",
+                    recoverable=True,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            )
             store["phase"] = "strategy_building"
             return events
-        events.append(make_tool_call(
-            tool="CampaignAgent.run" if self.use_agents else "campaign_strategist.strategise",
-            args={},
-            status="ok",
-            duration_ms=_now_ms() - t0,
-            result_summary=f"{len(campaign.style_cards)} cards",
-        ))
+        events.append(
+            make_tool_call(
+                tool="CampaignAgent.run" if self.use_agents else "campaign_strategist.strategise",
+                args={},
+                status="ok",
+                duration_ms=_now_ms() - t0,
+                result_summary=f"{len(campaign.style_cards)} cards",
+            )
+        )
         ctx["campaign"] = campaign
 
         # Strategy markdown
@@ -605,28 +697,33 @@ class ChatPipelineRunner:
         p1 = [c for c in campaign.style_cards if c.schedule and c.schedule.priority == "P1"]
         md_lines = [f"### P0 立即上线（{len(p0)} 款）"]
         for c in p0[:5]:
-            slot = (c.schedule.xiaohongshu_publish_at
-                    if c.schedule else "—") or "—"
+            slot = (c.schedule.xiaohongshu_publish_at if c.schedule else "—") or "—"
             md_lines.append(f"- **{c.style_name}** · 小红书: {slot}")
         if p1:
             md_lines.append(f"\n### P1 储备（{len(p1)} 款）")
             for c in p1[:5]:
                 md_lines.append(f"- {c.style_name}")
-        events.append(make_phase_output(
-            "strategy_building",
-            MarkdownOutput(title="本轮策略", body="\n".join(md_lines)),
-        ))
+        events.append(
+            make_phase_output(
+                "strategy_building",
+                MarkdownOutput(title="本轮策略", body="\n".join(md_lines)),
+            )
+        )
 
         # ── Checkpoint: strategy_review (Step 3 → Step 4) ─────────────────
         events.append(make_phase_enter("strategy_review", "策略评审", _elapsed(store)))
-        events.append(make_checkpoint(
-            "strategy_review",
-            f"策略已生成（P0 {len(p0)}, P1 {len(p1)}）。是否写入记忆并出报告？",
-            choices=[
-                CheckpointChoice(id="approve", label="✓ 出报告", style="primary", priority="P0"),
-                CheckpointChoice(id="abort",   label="✗ 中止",   style="danger",  priority="P0"),
-            ],
-        ))
+        events.append(
+            make_checkpoint(
+                "strategy_review",
+                f"策略已生成（P0 {len(p0)}, P1 {len(p1)}）。是否写入记忆并出报告？",
+                choices=[
+                    CheckpointChoice(
+                        id="approve", label="✓ 出报告", style="primary", priority="P0"
+                    ),
+                    CheckpointChoice(id="abort", label="✗ 中止", style="danger", priority="P0"),
+                ],
+            )
+        )
         return events
 
     def _phase_reporting(self, store: Dict[str, Any]) -> List[ChatEvent]:
@@ -646,45 +743,55 @@ class ChatPipelineRunner:
         try:
             report = summarizer.summarise(state)
         except Exception as exc:
-            events.append(make_error(
-                phase="reporting",
-                message=f"summarizer 失败: {exc}",
-                recoverable=True,
-                traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
-            ))
+            events.append(
+                make_error(
+                    phase="reporting",
+                    message=f"summarizer 失败: {exc}",
+                    recoverable=True,
+                    traceback_text=traceback.format_exc() if store.get("dev_mode") else None,
+                )
+            )
             store["phase"] = "reporting"
             return events
-        events.append(make_tool_call(
-            tool="summarizer.summarise",
-            args={},
-            status="ok",
-            duration_ms=_now_ms() - t0,
-            result_summary=f"{len(report.markdown)} chars",
-        ))
+        events.append(
+            make_tool_call(
+                tool="summarizer.summarise",
+                args={},
+                status="ok",
+                duration_ms=_now_ms() - t0,
+                result_summary=f"{len(report.markdown)} chars",
+            )
+        )
         ctx["report"] = report
 
         # Memory distillation (best-effort; failure shouldn't break the pipeline)
         try:
             new_insights = self.memory.distill(state.pipeline_id)
-            events.append(make_tool_call(
-                tool="memory.distill",
-                args={"pipeline_id": state.pipeline_id},
-                status="ok",
-                result_summary=f"{len(new_insights)} new insights",
-            ))
+            events.append(
+                make_tool_call(
+                    tool="memory.distill",
+                    args={"pipeline_id": state.pipeline_id},
+                    status="ok",
+                    result_summary=f"{len(new_insights)} new insights",
+                )
+            )
         except Exception as exc:
-            events.append(make_tool_call(
-                tool="memory.distill",
-                args={},
-                status="error",
-                result_summary=str(exc),
-            ))
+            events.append(
+                make_tool_call(
+                    tool="memory.distill",
+                    args={},
+                    status="error",
+                    result_summary=str(exc),
+                )
+            )
 
         # Final report output
-        events.append(make_phase_output(
-            "reporting",
-            MarkdownOutput(title="📄 运营报告", body=report.markdown),
-        ))
+        events.append(
+            make_phase_output(
+                "reporting",
+                MarkdownOutput(title="📄 运营报告", body=report.markdown),
+            )
+        )
 
         # Terminal state
         events.append(make_phase_enter("done", "完成 ✅", _elapsed(store)))
@@ -696,6 +803,7 @@ class ChatPipelineRunner:
 
     def _load_library(self) -> List[StyleLibraryItem]:
         import json
+
         try:
             with open(self.library_path, encoding="utf-8") as f:
                 return [StyleLibraryItem(**item) for item in json.load(f)]
@@ -708,3 +816,24 @@ def _elapsed(store: Dict[str, Any]) -> int:
     if not t0:
         return 0
     return int((time.time() - t0) * 1000)
+
+
+def _matched_style_names(signal: TrendSignal, library: List[StyleLibraryItem]) -> str:
+    """Return comma-joined names of library styles that share tags with signal."""
+    sig_tags = set(signal.style_tags or [])
+    if not sig_tags:
+        return "—"
+    matched = [item.style_name for item in library if sig_tags & set(item.style_tags or [])]
+    if not matched:
+        return "（空白机会）"
+    return "、".join(matched[:3]) + ("…" if len(matched) > 3 else "")
+
+
+def _trend_to_style_name(keyword: str, library: List[StyleLibraryItem]) -> str:
+    """Best-matching library style name for a trend keyword (exact name match first)."""
+    # Try exact match first
+    for item in library:
+        if item.style_name == keyword:
+            return item.style_name
+    # Fall back to keyword itself (may not be in library yet)
+    return keyword

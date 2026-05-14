@@ -11,6 +11,7 @@ Two modes:
 
 Falls back silently if not available or not logged in.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -38,22 +39,58 @@ _XHS_SKILLS_CANDIDATES = [
 # Nail-related keywords for title-based tag extraction and trending filter
 _NAIL_KWS = {
     # styles
-    "猫眼": "style", "法式": "style", "渐变": "style", "奶油": "style",
-    "3D": "style", "贴片": "style", "冰透": "style", "暗黑": "style",
-    "日式": "style", "韩式": "style", "ins风": "style", "极简": "style",
-    "波点": "style", "格纹": "style", "花朵": "style", "蝴蝶": "style",
-    "爱心": "style", "星月": "style", "手绘": "style", "光疗": "style",
-    "美甲": "style", "nail": "style",
+    "猫眼": "style",
+    "法式": "style",
+    "渐变": "style",
+    "奶油": "style",
+    "3D": "style",
+    "贴片": "style",
+    "冰透": "style",
+    "暗黑": "style",
+    "日式": "style",
+    "韩式": "style",
+    "ins风": "style",
+    "极简": "style",
+    "波点": "style",
+    "格纹": "style",
+    "花朵": "style",
+    "蝴蝶": "style",
+    "爱心": "style",
+    "星月": "style",
+    "手绘": "style",
+    "光疗": "style",
+    "美甲": "style",
+    "nail": "style",
     # colors
-    "白色": "color", "黑色": "color", "粉色": "color", "红色": "color",
-    "蓝色": "color", "紫色": "color", "绿色": "color", "裸色": "color",
-    "香芋": "color", "薄荷": "color", "莫兰迪": "color", "多巴胺": "color",
+    "白色": "color",
+    "黑色": "color",
+    "粉色": "color",
+    "红色": "color",
+    "蓝色": "color",
+    "紫色": "color",
+    "绿色": "color",
+    "裸色": "color",
+    "香芋": "color",
+    "薄荷": "color",
+    "莫兰迪": "color",
+    "多巴胺": "color",
     # materials
-    "甲油胶": "material", "钻": "material", "锡箔": "material", "贝壳": "material",
-    "磁铁石": "material", "镭射": "material", "亮片": "material",
+    "甲油胶": "material",
+    "钻": "material",
+    "锡箔": "material",
+    "贝壳": "material",
+    "磁铁石": "material",
+    "镭射": "material",
+    "亮片": "material",
     # scenes
-    "新娘": "scene", "日常": "scene", "约会": "scene", "通勤": "scene",
-    "夏日": "scene", "秋冬": "scene", "圣诞": "scene", "新年": "scene",
+    "新娘": "scene",
+    "日常": "scene",
+    "约会": "scene",
+    "通勤": "scene",
+    "夏日": "scene",
+    "秋冬": "scene",
+    "圣诞": "scene",
+    "新年": "scene",
 }
 
 _NAIL_CORE = {"美甲", "nail art", "nailart", "甲油胶", "指甲", "美甲师", "nail design"}
@@ -101,12 +138,14 @@ def _is_nail_related(text: str) -> bool:
     """True if text explicitly mentions a nail-specific term."""
     t = text.lower()
     # Explicit nail terms (unambiguous)
-    if any(kw in t for kw in ("美甲", "甲油胶", "指甲", "美甲师", "nail art", "nailart", "nail design")):
+    if any(
+        kw in t for kw in ("美甲", "甲油胶", "指甲", "美甲师", "nail art", "nailart", "nail design")
+    ):
         return True
     # "nail" only if not part of a non-nail compound (e.g. "cocktail", "email", "detail")
     if "nail" in t:
         idx = t.find("nail")
-        before = t[max(0, idx - 2):idx]
+        before = t[max(0, idx - 2) : idx]
         if not any(pre in before for pre in ("ck", "em", "de", "ai", "co", "di", "fi")):
             return True
     return False
@@ -164,22 +203,23 @@ class XHSSkillsFetcher:
             note = item.get("note") or item.get("noteCard") or item
             uid = note.get("id") or note.get("noteId") or item.get("id") or ""
             stable_uid = uid if uid else hashlib.md5(f"{keyword}{index}".encode()).hexdigest()[:12]
-            title = (
-                note.get("displayTitle") or note.get("title") or
-                note.get("display_title") or ""
-            )
+            title = note.get("displayTitle") or note.get("title") or note.get("display_title") or ""
             desc = note.get("desc") or note.get("description") or note.get("content") or ""
             caption = f"{title} {desc}".strip()[:200]
 
             stats = (
-                note.get("interactInfo") or note.get("interact_info") or
-                note.get("statistics") or {}
+                note.get("interactInfo")
+                or note.get("interact_info")
+                or note.get("statistics")
+                or {}
             )
             likes = _safe_int(
                 stats.get("likedCount") or stats.get("liked_count") or stats.get("like_count")
             )
             collects = _safe_int(
-                stats.get("collectedCount") or stats.get("collected_count") or stats.get("collect_count")
+                stats.get("collectedCount")
+                or stats.get("collected_count")
+                or stats.get("collect_count")
             )
             comments = _safe_int(stats.get("commentCount") or stats.get("comment_count"))
             shares = _safe_int(stats.get("shareCount") or stats.get("share_count"))
@@ -301,7 +341,9 @@ class XHSSkillsFetcher:
             all_items = self._parse_output(result.stdout, "美甲")
             nail_items = [s for s in all_items if _is_nail_related(s.caption)]
 
-            logger.info("XHS skills trending: %d total → %d nail-related", len(all_items), len(nail_items))
+            logger.info(
+                "XHS skills trending: %d total → %d nail-related", len(all_items), len(nail_items)
+            )
             return nail_items[:limit]
 
         except subprocess.TimeoutExpired:

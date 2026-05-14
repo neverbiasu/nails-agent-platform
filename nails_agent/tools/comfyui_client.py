@@ -5,9 +5,9 @@ Auth: X-API-Key: comfyui-{key}
 
 Fixed upload → submit → poll → CDN-URL flow.
 """
+
 from __future__ import annotations
 
-import json
 import os
 import time
 import uuid
@@ -132,6 +132,7 @@ class ComfyUIClient:
                           `inputs.prompt` field).
         """
         import copy
+
         wf = copy.deepcopy(workflow)
 
         # Upload + patch images
@@ -140,7 +141,10 @@ class ComfyUIClient:
                 return {"success": False, "error": f"Image node '{node_id}' missing in workflow"}
             name = self.upload_image(path)
             if not name:
-                return {"success": False, "error": f"Failed to upload image for node {node_id}: {path}"}
+                return {
+                    "success": False,
+                    "error": f"Failed to upload image for node {node_id}: {path}",
+                }
             wf[node_id].setdefault("inputs", {})["image"] = name
 
         # Optional text overrides

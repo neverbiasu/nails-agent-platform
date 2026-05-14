@@ -6,16 +6,16 @@ Output: CampaignStrategyResult
 Merges metric scores with drafted style cards, assigns publish schedule,
 and produces final StyleCard objects ready for execution.
 """
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta, date
-from typing import Dict, List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List
 
 from nails_agent.models.schemas import (
     ValueEvaluationResult,
     AssetGenerationResult,
-    StyleCardDraft,
     MetricSnapshot,
     StyleCard,
     PublishSchedule,
@@ -76,9 +76,7 @@ def strategise(
     now = datetime.now(_TZ8)
 
     # Index metrics by trend_id
-    metric_map: Dict[str, MetricSnapshot] = {
-        m.trend_id: m for m in value_result.snapshots
-    }
+    metric_map: Dict[str, MetricSnapshot] = {m.trend_id: m for m in value_result.snapshots}
 
     style_cards: List[StyleCard] = []
     for draft in asset_result.drafts:

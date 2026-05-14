@@ -6,6 +6,7 @@ Output: TrendAnalysisResult
 Computes composite_score, ranks top-10, detects cross-platform patterns,
 flags anomalies with high recent growth.
 """
+
 from __future__ import annotations
 
 import json
@@ -27,9 +28,18 @@ def _composite(sig: TrendSignal) -> float:
 # We strip these from aggregated style trends so the report doesn't echo back
 # its own inputs ("美甲推荐" is a search term, not a style).
 _SEARCH_NOISE_TAGS = {
-    "美甲", "美甲推荐", "美甲灵感", "美甲教程", "夏日美甲",
-    "显白美甲", "法式美甲", "高级美甲", "nail", "nailart",
-    "naildesign", "美甲日记",
+    "美甲",
+    "美甲推荐",
+    "美甲灵感",
+    "美甲教程",
+    "夏日美甲",
+    "显白美甲",
+    "法式美甲",
+    "高级美甲",
+    "nail",
+    "nailart",
+    "naildesign",
+    "美甲日记",
 }
 
 
@@ -42,9 +52,15 @@ def _aggregate_style_trends(signals: List[TrendSignal]) -> List[StyleTrend]:
     def _add(tag: str, category: str, sig: TrendSignal):
         if not tag or tag.lower() in _SEARCH_NOISE_TAGS:
             return
-        b = bucket.setdefault(tag, {
-            "category": category, "post_count": 0, "engagement": 0, "best": sig,
-        })
+        b = bucket.setdefault(
+            tag,
+            {
+                "category": category,
+                "post_count": 0,
+                "engagement": 0,
+                "best": sig,
+            },
+        )
         b["post_count"] += 1
         b["engagement"] += int(_composite(sig))
         if _composite(sig) > _composite(b["best"]):
@@ -67,14 +83,16 @@ def _aggregate_style_trends(signals: List[TrendSignal]) -> List[StyleTrend]:
     trends: List[StyleTrend] = []
     for tag, b in bucket.items():
         score = round(b["engagement"] / max_eng * 100, 1)
-        trends.append(StyleTrend(
-            tag=tag,
-            category=b["category"],
-            post_count=b["post_count"],
-            total_engagement=b["engagement"],
-            aggregated_score=score,
-            sample_caption=b["best"].caption[:80],
-        ))
+        trends.append(
+            StyleTrend(
+                tag=tag,
+                category=b["category"],
+                post_count=b["post_count"],
+                total_engagement=b["engagement"],
+                aggregated_score=score,
+                sample_caption=b["best"].caption[:80],
+            )
+        )
 
     # Filter single-post tags (too noisy) and sort
     trends = [t for t in trends if t.post_count >= 2]
@@ -92,7 +110,9 @@ def _normalise(scores: List[float]) -> List[float]:
 def analyse(signals: List[TrendSignal]) -> TrendAnalysisResult:
     if not signals:
         return TrendAnalysisResult(
-            top_10=[], patterns=[], anomalies=[],
+            top_10=[],
+            patterns=[],
+            anomalies=[],
             timestamp=datetime.now(_TZ8).isoformat(),
         )
 
@@ -112,7 +132,8 @@ def analyse(signals: List[TrendSignal]) -> TrendAnalysisResult:
     style_trends = _aggregate_style_trends(signals)
 
     # 4. Cross-platform co-occurrence patterns (filtered to real style tags)
-    real_tag_filter = lambda t: t and t.lower() not in _SEARCH_NOISE_TAGS
+    def real_tag_filter(t: str) -> bool:
+        return bool(t) and t.lower() not in _SEARCH_NOISE_TAGS
 
     tag_platform: Dict[str, set] = {}
     for sig in signals:
@@ -161,7 +182,9 @@ def analyse(signals: List[TrendSignal]) -> TrendAnalysisResult:
     for sig in recent_signals:
         for tag in sig.style_tags + sig.color_tags + sig.material_tags + sig.scene_tags:
             if real_tag_filter(tag):
-                recent_tag_engagement[tag] = recent_tag_engagement.get(tag, 0) + int(_composite(sig))
+                recent_tag_engagement[tag] = recent_tag_engagement.get(tag, 0) + int(
+                    _composite(sig)
+                )
 
     anomalies: List[str] = []
     if recent_tag_engagement:

@@ -136,9 +136,9 @@ def _render_gallery(data) -> None:
 
 
 def _render_checkpoint(event: ChatEvent, store: Dict[str, Any]) -> None:
+    import time as _time
+
     p = event.payload
-    # If this checkpoint has been resolved (a later phase_enter exists),
-    # render it in collapsed/disabled form. Otherwise interactive.
     is_open = _is_checkpoint_open(event, store)
 
     st.markdown(f"💡 **{p.prompt}**")
@@ -146,11 +146,41 @@ def _render_checkpoint(event: ChatEvent, store: Dict[str, Any]) -> None:
         st.caption("（已确认）")
         return
 
+    # Auto-approve: if auto_mode is on AND there's a P1 auto-approve configured,
+    # show a countdown and fire it automatically when the timer expires.
+    auto_key = f"_auto_{event.event_id}"
+    if (
+        store.get("auto_mode")
+        and p.auto_approve_after_s is not None
+        and p.auto_approve_choice_id is not None
+    ):
+        # Determine which choice is auto-approved
+        auto_choice = next(
+            (c for c in p.choices if c.id == p.auto_approve_choice_id and c.priority == "P1"),
+            None,
+        )
+        if auto_choice:
+            start_ts = store.get(auto_key)
+            if start_ts is None:
+                store[auto_key] = _time.time()
+                start_ts = store[auto_key]
+            elapsed = _time.time() - start_ts
+            remaining = max(0.0, p.auto_approve_after_s - elapsed)
+            if remaining == 0:
+                # Fire auto-approve
+                chat_state.queue_choice(store, p.phase, auto_choice.id, {})
+                st.rerun()
+            else:
+                st.caption(
+                    f"⏱ 自动执行「{auto_choice.label}」倒计时 **{remaining:.0f}s** — 点击按钮可提前确认或取消"
+                )
+                st.progress(1 - remaining / p.auto_approve_after_s)
+
+    # Render buttons
     cols = st.columns(len(p.choices))
     btn_type_map = {"primary": "primary", "secondary": "secondary", "danger": "secondary"}
     for col, choice in zip(cols, p.choices):
         with col:
-            # Inline form fields above the button, if any
             form_values: Dict[str, Any] = {}
             if choice.form:
                 for field in choice.form:
@@ -169,14 +199,13 @@ def _render_checkpoint(event: ChatEvent, store: Dict[str, Any]) -> None:
                             default=field.default or [], key=key,
                         )
             label = choice.label
-            if choice.priority == "P1":
-                label = f"{label}  · P1"
+            if choice.priority == "P1" and store.get("auto_mode"):
+                label = f"{label}  ·  P1 自动"
             if st.button(label, type=btn_type_map[choice.style],
                           key=f"cp_{event.event_id}_{choice.id}",
                           use_container_width=True):
-                chat_state.queue_choice(
-                    store, p.phase, choice.id, form_values,
-                )
+                store.pop(auto_key, None)  # cancel any running timer
+                chat_state.queue_choice(store, p.phase, choice.id, form_values)
                 st.rerun()
 
 

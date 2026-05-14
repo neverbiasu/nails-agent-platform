@@ -11,9 +11,9 @@ Setup (one-time):
   2. Manually open douyin.com in that Chrome and log in
   3. Leave the tab open — our fetcher reuses it
 """
+
 from __future__ import annotations
 
-import json
 import logging
 import time
 import urllib.parse
@@ -22,7 +22,10 @@ from typing import Any, Dict, List, Optional
 
 from nails_agent.models.schemas import TrendSignal
 from nails_agent.tools.fetchers.tikhub_fetcher import (
-    _classify_tags, _is_nail_related, _make_trend_id, _ts_to_iso,
+    _classify_tags,
+    _is_nail_related,
+    _make_trend_id,
+    _ts_to_iso,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,6 +103,7 @@ class DouyinCDPFetcher:
         """True if Chrome is reachable (Douyin tab is checked lazily during search)."""
         try:
             import requests
+
             return requests.get(f"{self.cdp_url}/json/version", timeout=2).status_code == 200
         except Exception:
             return False
@@ -177,7 +181,9 @@ class DouyinCDPFetcher:
                 try:
                     search_url = _SEARCH_URL.format(kw=urllib.parse.quote(kw))
                     logger.info("Douyin CDP: searching '%s' (target %d)", kw, limit_per_kw)
-                    douyin_page.goto(search_url, timeout=self.timeout_ms, wait_until="domcontentloaded")
+                    douyin_page.goto(
+                        search_url, timeout=self.timeout_ms, wait_until="domcontentloaded"
+                    )
 
                     # Initial XHR wait
                     deadline = time.time() + 10
@@ -218,9 +224,13 @@ class DouyinCDPFetcher:
                         douyin_page.wait_for_timeout(800)  # settle
                         _drain()
                         scrolls += 1
-                        logger.debug("Douyin CDP: '%s' scroll %d → %d signals", kw, scrolls, len(signals))
+                        logger.debug(
+                            "Douyin CDP: '%s' scroll %d → %d signals", kw, scrolls, len(signals)
+                        )
 
-                    logger.info("Douyin CDP: '%s' → %d signals (%d scrolls)", kw, len(signals), scrolls)
+                    logger.info(
+                        "Douyin CDP: '%s' → %d signals (%d scrolls)", kw, len(signals), scrolls
+                    )
                     all_signals.extend(signals[:limit_per_kw])
 
                 except Exception as e:

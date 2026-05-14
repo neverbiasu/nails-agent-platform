@@ -22,15 +22,15 @@ XHS note (web_v2):
   interact_info.*     → engagement metrics
   tag_list[].name     → raw_tags
 """
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import os
 import re
-import time
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from nails_agent.models.schemas import TrendSignal
 
@@ -40,9 +40,34 @@ _TZ8 = timezone(timedelta(hours=8))
 
 # Keywords that indicate nail-art content (for tag filtering)
 _NAIL_KEYWORDS = {
-    "美甲", "nail", "指甲", "美甲师", "猫眼", "法式", "渐变", "3D", "浮雕", "贴片",
-    "甲油胶", "磁铁", "暗黑", "奶油", "哑光", "冰透", "钻石", "韩式", "日式",
-    "短甲", "长甲", "方甲", "尖甲", "设计", "款式", "显白", "夏日", "秋冬",
+    "美甲",
+    "nail",
+    "指甲",
+    "美甲师",
+    "猫眼",
+    "法式",
+    "渐变",
+    "3D",
+    "浮雕",
+    "贴片",
+    "甲油胶",
+    "磁铁",
+    "暗黑",
+    "奶油",
+    "哑光",
+    "冰透",
+    "钻石",
+    "韩式",
+    "日式",
+    "短甲",
+    "长甲",
+    "方甲",
+    "尖甲",
+    "设计",
+    "款式",
+    "显白",
+    "夏日",
+    "秋冬",
 }
 
 
@@ -58,9 +83,38 @@ def _extract_hashtags(text: str) -> List[str]:
 
 def _classify_tags(tags: List[str], caption: str) -> dict:
     """Split raw tags into style/color/material/scene buckets."""
-    color_words = {"蓝", "粉", "红", "白", "黑", "紫", "绿", "金", "银", "肉", "裸", "棕", "橙", "冰蓝", "肤色"}
+    color_words = {
+        "蓝",
+        "粉",
+        "红",
+        "白",
+        "黑",
+        "紫",
+        "绿",
+        "金",
+        "银",
+        "肉",
+        "裸",
+        "棕",
+        "橙",
+        "冰蓝",
+        "肤色",
+    }
     material_words = {"磁铁", "雕花", "钻", "硬胶", "甲油胶", "贴片", "浮雕", "渐变粉", "磁铁石"}
-    scene_words = {"通勤", "约会", "日常", "夏季", "秋冬", "春季", "节日", "拍照", "晚宴", "度假", "显白", "商务"}
+    scene_words = {
+        "通勤",
+        "约会",
+        "日常",
+        "夏季",
+        "秋冬",
+        "春季",
+        "节日",
+        "拍照",
+        "晚宴",
+        "度假",
+        "显白",
+        "商务",
+    }
 
     style_tags, color_tags, material_tags, scene_tags = [], [], [], []
     for tag in tags:
@@ -135,6 +189,7 @@ class TikHubFetcher:
         if self._client is None:
             try:
                 import tikhub
+
                 self._client = tikhub.TikHub(api_key=self.api_key)
             except ImportError:
                 raise ImportError("pip install tikhub")
@@ -158,8 +213,8 @@ class TikHubFetcher:
             try:
                 resp = self.client.douyin_search.fetch_video_search_v1(
                     keyword=kw,
-                    sort_type="0",       # 综合排序
-                    publish_time="0",    # 不限时间
+                    sort_type="0",  # 综合排序
+                    publish_time="0",  # 不限时间
                 )
                 if resp.get("code") != 200:
                     logger.warning("Douyin search failed for '%s': %s", kw, resp.get("message"))
@@ -171,12 +226,18 @@ class TikHubFetcher:
                     if not info:
                         continue
 
-                    raw_tags = [t.get("hashtag_name", "") for t in info.get("text_extra", []) if t.get("type") == 1]
+                    raw_tags = [
+                        t.get("hashtag_name", "")
+                        for t in info.get("text_extra", [])
+                        if t.get("type") == 1
+                    ]
                     caption = info.get("desc", "")
                     stats = info.get("statistics", {})
 
                     # Skip non-nail content
-                    if not _is_nail_related(caption) and not any(_is_nail_related(t) for t in raw_tags):
+                    if not _is_nail_related(caption) and not any(
+                        _is_nail_related(t) for t in raw_tags
+                    ):
                         if not _is_nail_related(kw):
                             continue
 
@@ -267,10 +328,10 @@ class TikHubFetcher:
                 data = resp.get("data", {})
                 # Response structure varies between endpoints
                 items = (
-                    data.get("items") or
-                    data.get("notes") or
-                    data.get("data", {}).get("items") or
-                    []
+                    data.get("items")
+                    or data.get("notes")
+                    or data.get("data", {}).get("items")
+                    or []
                 )
 
                 for item in items[:limit_per_kw]:
@@ -289,23 +350,24 @@ class TikHubFetcher:
                     # Engagement metrics (field names vary)
                     interact = note.get("interact_info") or note.get("statistics") or {}
                     likes = (
-                        interact.get("liked_count") or
-                        interact.get("like_count") or
-                        interact.get("digg_count") or 0
+                        interact.get("liked_count")
+                        or interact.get("like_count")
+                        or interact.get("digg_count")
+                        or 0
                     )
                     collects = (
-                        interact.get("collected_count") or
-                        interact.get("collect_count") or
-                        interact.get("collects") or 0
+                        interact.get("collected_count")
+                        or interact.get("collect_count")
+                        or interact.get("collects")
+                        or 0
                     )
-                    comments = (
-                        interact.get("comment_count") or
-                        interact.get("comments") or 0
-                    )
+                    comments = interact.get("comment_count") or interact.get("comments") or 0
                     shares = interact.get("share_count") or interact.get("shares") or 0
 
                     # Tags
-                    raw_tags = [t.get("name") or t.get("text", "") for t in (note.get("tag_list") or [])]
+                    raw_tags = [
+                        t.get("name") or t.get("text", "") for t in (note.get("tag_list") or [])
+                    ]
                     classified = _classify_tags([t for t in raw_tags if t], caption)
 
                     sig = TrendSignal(
@@ -348,7 +410,9 @@ class TikHubFetcher:
                     keyword=kw,
                     caption=f"小红书热榜：{kw}",
                     likes=item.get("view_num", 5000),
-                    comments=0, shares=0, collects=0,
+                    comments=0,
+                    shares=0,
+                    collects=0,
                     publish_time=now_iso,
                     captured_at=now_iso,
                     style_tags=[kw],
@@ -367,11 +431,18 @@ class TikHubFetcher:
     ) -> List[TrendSignal]:
         """Fetch from Douyin + XHS in parallel, return combined signals."""
         kws = keywords or [
-            "美甲", "猫眼美甲", "法式美甲", "渐变美甲",
-            "奶油美甲", "3D美甲", "贴片美甲", "冰透美甲",
+            "美甲",
+            "猫眼美甲",
+            "法式美甲",
+            "渐变美甲",
+            "奶油美甲",
+            "3D美甲",
+            "贴片美甲",
+            "冰透美甲",
         ]
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         tasks = {
             "douyin_search": lambda: self.fetch_douyin_search(kws, limit_per_kw),
             "xhs_search": lambda: self.fetch_xhs_search(kws, limit_per_kw),

@@ -2,23 +2,33 @@
 FastAPI application — Nails Agent Platform.
 
 Endpoints:
-  POST /chat           — natural-language trigger for pipeline runs
-  POST /pipeline/run   — explicit full pipeline trigger
-  POST /pipeline/trend — step 1 only (trend analysis)
-  GET  /pipeline/{id}  — pipeline state query
-  GET  /pipeline/list  — recent pipeline runs
-  POST /tryon          — ComfyUI style try-on
-  GET  /styles         — style library listing
-  GET  /health         — health check
+  POST /chat                                          — natural-language trigger for pipeline runs
+  POST /pipeline/run                                  — explicit full pipeline trigger
+  POST /pipeline/trend                                — step 1 only (trend analysis)
+  GET  /pipeline/{id}                                 — pipeline state query
+  GET  /pipeline/list                                 — recent pipeline runs
+  POST /tryon                                         — (legacy / merchant) ComfyUI try-on
+  GET  /styles                                        — style library listing (V2 from SQLite)
+  GET  /health                                        — health check
+
+Consumer try-on (V1):
+  POST /hand/analyze                                  — analyze a hand photo
+  POST /sessions                                      — create a session from an uploaded hand
+  GET  /sessions/{id}                                 — fetch session + image + profile
+  POST /sessions/{id}/recommendations/round1          — generate round 1 recommendations
+  POST /sessions/{id}/recommendations/round2          — generate round 2 (visual-similarity rerank)
+  POST /sessions/{id}/events                          — record click / try_on_start / try_on_success
+  POST /sessions/{id}/tryon                           — real ComfyUI try-on scoped to session
 """
+
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -27,11 +37,17 @@ from nails_agent.models.schemas import (
     ChatResponse,
     TryOnRequest,
     TryOnResponse,
-    PipelineState,
-    StyleLibraryItem,
+    HandAnalyzeResponse,
+    SessionCreateResponse,
+    BehaviorEventRequest,
+    ConsumerTryOnRequest,
 )
 from nails_agent.memory.store import MemoryStore
 from nails_agent.agents.orchestrator import PipelineOrchestrator
+from nails_agent.services.style_library import StyleLibrary
+from nails_agent.services.session_service import SessionService, annotated_image_b64
+from nails_agent.services.recommendation import RecommendationService
+from nails_agent.services.interaction import InteractionService
 
 app = FastAPI(
     title="Nails Agent Platform",
@@ -53,10 +69,12 @@ _orchestrator: Optional[PipelineOrchestrator] = None
 
 DATA_DIR = os.environ.get("NAILS_DATA_DIR", "demo/data")
 OUTPUT_DIR = os.environ.get("NAILS_OUTPUT_DIR", "demo/output")
-WORKFLOW_PATH = Path(os.environ.get(
-    "NAILS_WORKFLOW_PATH",
-    "workflows/nail_tryon_klein_9b.json",
-))
+WORKFLOW_PATH = Path(
+    os.environ.get(
+        "NAILS_WORKFLOW_PATH",
+        "workflows/nail_tryon_klein_9b.json",
+    )
+)
 HAND_REF_PATH = Path(DATA_DIR).parent / "static" / "hand_reference.jpg"
 NAIL_REF_PATH = Path(DATA_DIR).parent / "static" / "nail_reference.jpg"
 
@@ -79,7 +97,44 @@ def get_orchestrator() -> PipelineOrchestrator:
     return _orchestrator
 
 
+# ── Consumer-side service singletons ──────────────────────────────────────────
+
+_session_service: Optional[SessionService] = None
+_style_library: Optional[StyleLibrary] = None
+_recommendation_service: Optional[RecommendationService] = None
+_interaction_service: Optional[InteractionService] = None
+
+
+def get_style_library() -> StyleLibrary:
+    global _style_library
+    if _style_library is None:
+        _style_library = StyleLibrary(get_memory())
+    return _style_library
+
+
+def get_session_service() -> SessionService:
+    global _session_service
+    if _session_service is None:
+        _session_service = SessionService(get_memory())
+    return _session_service
+
+
+def get_recommendation_service() -> RecommendationService:
+    global _recommendation_service
+    if _recommendation_service is None:
+        _recommendation_service = RecommendationService(get_memory(), get_style_library())
+    return _recommendation_service
+
+
+def get_interaction_service() -> InteractionService:
+    global _interaction_service
+    if _interaction_service is None:
+        _interaction_service = InteractionService(get_memory(), get_style_library())
+    return _interaction_service
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health():
@@ -144,6 +199,7 @@ async def chat(req: ChatRequest, background_tasks: BackgroundTasks):
 
 # ── Pipeline endpoints ────────────────────────────────────────────────────────
 
+
 class PipelineRunResponse(BaseModel):
     pipeline_id: str
     status: str
@@ -189,6 +245,7 @@ async def pipeline_get(pipeline_id: str):
 
 # ── Memory search ─────────────────────────────────────────────────────────────
 
+
 @app.get("/memory/search")
 async def memory_search(q: str, kind: Optional[str] = None, limit: int = 10):
     results = get_memory().search(q, kind=kind, limit=limit)
@@ -201,22 +258,36 @@ async def memory_insights(limit: int = 20):
     return [r.model_dump() for r in results]
 
 
-# ── Style library ─────────────────────────────────────────────────────────────
+# ── Style library (V2 from SQLite, with optional legacy passthrough) ──────────
+
 
 @app.get("/styles")
-async def list_styles():
-    path = Path(DATA_DIR) / "style_library.json"
-    if not path.exists():
-        return []
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+async def list_styles(
+    try_on_only: bool = False,
+    with_visual_feature_only: bool = False,
+):
+    """Unified V2 style library backed by SQLite (`nail_styles_v2`)."""
+    return get_style_library().list_styles(
+        try_on_only=try_on_only,
+        with_visual_feature_only=with_visual_feature_only,
+    )
+
+
+@app.get("/styles/{style_id}")
+async def get_style(style_id: str):
+    style = get_style_library().get_style(style_id)
+    if not style:
+        raise HTTPException(status_code=404, detail="Style not found")
+    return style
 
 
 # ── Try-on ────────────────────────────────────────────────────────────────────
 
+
 @app.post("/tryon", response_model=TryOnResponse)
 async def tryon(req: TryOnRequest):
     import time
+
     t0 = time.time()
 
     # Resolve style image
@@ -246,6 +317,7 @@ async def tryon(req: TryOnRequest):
     # Run via ComfyUI client
     try:
         from nails_agent.tools.comfyui_client import ComfyUIClient
+
         client = ComfyUIClient()
         result = client.run_tryon(
             workflow=workflow,
@@ -266,3 +338,161 @@ async def tryon(req: TryOnRequest):
             fallback_url=str(NAIL_REF_PATH),
             duration_s=round(time.time() - t0, 1),
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Consumer (V1) endpoints — session-scoped try-on flow
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@app.post("/hand/analyze", response_model=HandAnalyzeResponse)
+async def hand_analyze(image: UploadFile = File(...)):
+    """Run MediaPipe + rule-based hand/skin classification on an uploaded image."""
+    try:
+        from nails_agent.services.hand_analyzer import (
+            analyze_hand_image,
+            HAND_SHAPE_LABELS,
+            SKIN_TONE_LABELS,
+            UNDERTONE_LABELS,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Hand analysis unavailable (missing dep): {exc}",
+        )
+
+    blob = await image.read()
+    try:
+        analysis = analyze_hand_image(blob)
+    except Exception as exc:
+        return HandAnalyzeResponse(ok=False, error=f"{type(exc).__name__}: {exc}")
+
+    return HandAnalyzeResponse(
+        ok=analysis["ok"],
+        error=analysis.get("error"),
+        hand_shape=analysis.get("hand_shape", "unknown"),
+        hand_shape_label=HAND_SHAPE_LABELS.get(analysis.get("hand_shape", "unknown"), ""),
+        hand_shape_confidence=analysis.get("hand_shape_confidence", 0.0),
+        skin_tone=analysis.get("skin_tone", "unknown"),
+        skin_tone_label=SKIN_TONE_LABELS.get(analysis.get("skin_tone", "unknown"), ""),
+        skin_confidence=analysis.get("skin_confidence", 0.0),
+        undertone=analysis.get("undertone", "unknown"),
+        undertone_label=UNDERTONE_LABELS.get(analysis.get("undertone", "unknown"), ""),
+        undertone_confidence=analysis.get("undertone_confidence", 0.0),
+        median_rgb=analysis.get("median_rgb", []),
+        metrics=analysis.get("metrics", {}),
+        color_metrics=analysis.get("color_metrics", {}),
+        annotated_image_b64=annotated_image_b64(analysis) if analysis.get("ok") else "",
+    )
+
+
+@app.post("/sessions", response_model=SessionCreateResponse)
+async def create_session(image: UploadFile = File(...)):
+    """Create a new try-on session from an uploaded hand image."""
+    try:
+        from nails_agent.services.hand_analyzer import analyze_hand_image
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Hand analysis unavailable (missing dep): {exc}",
+        )
+
+    blob = await image.read()
+    try:
+        analysis = analyze_hand_image(blob)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Analysis failed: {exc}")
+
+    if not analysis["ok"]:
+        raise HTTPException(status_code=400, detail=analysis.get("error", "Hand not detected"))
+
+    created = get_session_service().create_session_from_analysis(
+        analysis, source_name=image.filename or "upload.png"
+    )
+    # Eagerly generate Round 1 so a fresh session has recommendations immediately.
+    get_recommendation_service().generate_round1(
+        created["session"]["session_id"], created["hand_profile"]
+    )
+    return SessionCreateResponse(**created)
+
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    svc = get_session_service()
+    session = svc.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session": session,
+        "user_image": svc.session_user_image(session_id),
+        "hand_profile": svc.session_hand_profile(session_id),
+    }
+
+
+@app.post("/sessions/{session_id}/recommendations/round1")
+async def session_round1(session_id: str):
+    svc = get_session_service()
+    profile = svc.session_hand_profile(session_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Session or hand profile not found")
+    return get_recommendation_service().generate_round1(session_id, profile)
+
+
+@app.post("/sessions/{session_id}/recommendations/round2")
+async def session_round2(session_id: str):
+    snap = get_recommendation_service().generate_round2(session_id)
+    if snap is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Round 2 needs at least one behavior event (click or try-on) first.",
+        )
+    return snap
+
+
+@app.get("/sessions/{session_id}/recommendations/latest")
+async def session_latest_snapshot(session_id: str, round_no: Optional[int] = None):
+    snap = get_recommendation_service().latest_snapshot(session_id, round_no=round_no)
+    if not snap:
+        raise HTTPException(status_code=404, detail="No snapshot for this session")
+    return snap
+
+
+@app.post("/sessions/{session_id}/events")
+async def session_event(session_id: str, event: BehaviorEventRequest):
+    return get_interaction_service().record_behavior(
+        session_id=session_id,
+        style_id=event.style_id,
+        event_type=event.event_type,
+        source_snapshot_id=event.source_snapshot_id,
+    )
+
+
+@app.get("/sessions/{session_id}/events")
+async def session_events_list(session_id: str):
+    return get_interaction_service().session_events(session_id)
+
+
+@app.post("/sessions/{session_id}/tryon")
+async def session_tryon(session_id: str, req: ConsumerTryOnRequest):
+    svc = get_session_service()
+    user_image = svc.session_user_image(session_id)
+    if not user_image:
+        raise HTTPException(status_code=404, detail="Session image not found")
+    style = get_style_library().get_style(req.style_id)
+    if not style:
+        raise HTTPException(status_code=404, detail="Style not found")
+    job = get_interaction_service().run_tryon(
+        session_id=session_id,
+        style=style,
+        user_image=user_image,
+        source_snapshot_id=req.source_snapshot_id,
+    )
+    return job
+
+
+@app.get("/sessions/{session_id}/tryon/latest")
+async def session_latest_tryon(session_id: str):
+    job = get_interaction_service().latest_try_on_job(session_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="No try-on jobs yet")
+    return job

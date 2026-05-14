@@ -1,0 +1,74 @@
+[
+  {
+    "undertone": "unknown",
+    "display_name": "未识别",
+    "description": "肤色采样区域过小或颜色波动过大。",
+    "feature_rules": {
+      "any_rules": [
+        {"sample_stability_lt": 0.35},
+        {"sample_size_lt": 30}
+      ]
+    },
+    "confidence_cap": 0.0,
+    "reason": "肤色采样区域不稳定",
+    "priority": 100
+  },
+  {
+    "undertone": "neutral",
+    "display_name": "中性",
+    "description": "饱和度较低，冷暖倾向不明显。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "hsv_s_lt": 0.12,
+      "lab_b_min": 10,
+      "lab_b_max": 18
+    },
+    "confidence_cap": 0.86,
+    "reason": "饱和度较低，冷暖不明显",
+    "priority": 90
+  },
+  {
+    "undertone": "warm",
+    "display_name": "暖调",
+    "description": "黄调、蜜桃调或红调更明显。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "any_rules": [
+        {"lab_b_min": 18},
+        {"ycrcb_cr_minus_cb_min": 12}
+      ]
+    },
+    "confidence_cap": 0.88,
+    "reason": "黄调或红色色度更明显",
+    "priority": 80
+  },
+  {
+    "undertone": "cool",
+    "display_name": "冷调",
+    "description": "蓝调、青调或冷感更明显。",
+    "feature_rules": {
+      "sample_stability_min": 0.35,
+      "sample_size_min": 30,
+      "any_rules": [
+        {"lab_b_max": 10},
+        {"ycrcb_cb_minus_cr_min": 8}
+      ]
+    },
+    "confidence_cap": 0.88,
+    "reason": "蓝调/冷调特征更明显",
+    "priority": 70
+  },
+  {
+    "undertone": "neutral",
+    "display_name": "中性",
+    "description": "边界情况默认归为中性。",
+    "feature_rules": {
+      "default": true
+    },
+    "confidence_cap": 0.78,
+    "reason": "冷暖特征接近，归为中性",
+    "priority": 1
+  }
+]

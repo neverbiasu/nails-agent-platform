@@ -4,13 +4,17 @@ TrendScoutAgent — public API for running trend analysis.
 Uses openai-agents SDK Runner with TrendScoutAgent (Qwen3 / Claude via OpenRouter).
 Falls back to rule-based analysis if no API key is available.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 from datetime import datetime, timezone, timedelta
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
+
+if TYPE_CHECKING:
+    from nails_agent.models.schemas import TrendAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +33,6 @@ def run_trend_scout(
     Returns TrendAnalysisResult. Falls back to rule-based if no API key.
     """
     from nails_agent.agents.agent_config import is_available
-    from nails_agent.models.schemas import TrendAnalysisResult
 
     if not is_available():
         if progress_cb:
@@ -51,7 +54,6 @@ def run_trend_scout(
 
     try:
         import asyncio
-        from agents import Runner
         from nails_agent.agents.nail_agents import get_trend_scout_agent
 
         agent = get_trend_scout_agent()
@@ -59,8 +61,8 @@ def run_trend_scout(
         if progress_cb:
             progress_cb("🤖 TrendScoutAgent 启动 (Qwen3)…")
 
-        # Run synchronously; stream events for progress
-        result = asyncio.get_event_loop().run_until_complete(
+        # Run synchronously; stream events for progress (result written to disk)
+        asyncio.get_event_loop().run_until_complete(
             _run_with_progress(agent, user_msg, progress_cb, max_turns)
         )
 
@@ -76,7 +78,6 @@ def run_trend_scout(
 
 async def _run_with_progress(agent, user_msg: str, progress_cb, max_turns: int):
     from agents import Runner
-    from agents.stream_events import RunItemStreamEvent, RawResponsesStreamEvent
 
     async with Runner.run_streamed(agent, user_msg, max_turns=max_turns) as stream:
         async for event in stream.stream_events():
@@ -88,7 +89,6 @@ async def _run_with_progress(agent, user_msg: str, progress_cb, max_turns: int):
                     item = event.item
                     # Tool call progress
                     if hasattr(item, "type") and item.type == "tool_call_item":
-                        tool_name = getattr(item, "raw_item", {})
                         if progress_cb and hasattr(item, "raw_item"):
                             ri = item.raw_item
                             name = getattr(ri, "name", "") if hasattr(ri, "name") else ""
@@ -116,25 +116,25 @@ def _load_trend_result(output_dir: str, progress_cb) -> "TrendAnalysisResult":
     style_trends: List[StyleTrend] = []
     for st in data.get("style_trends", []):
         try:
-            style_trends.append(StyleTrend(
-                tag=st["tag"],
-                category=st.get("category", "style"),
-                post_count=int(st.get("post_count", 0)),
-                total_engagement=int(st.get("total_engagement", 0)),
-                aggregated_score=float(st.get("aggregated_score", 0)),
-                sample_caption=st.get("sample_caption", ""),
-            ))
+            style_trends.append(
+                StyleTrend(
+                    tag=st["tag"],
+                    category=st.get("category", "style"),
+                    post_count=int(st.get("post_count", 0)),
+                    total_engagement=int(st.get("total_engagement", 0)),
+                    aggregated_score=float(st.get("aggregated_score", 0)),
+                    sample_caption=st.get("sample_caption", ""),
+                )
+            )
         except Exception:
             pass
 
     top_10: List[TrendSignal] = []
     for raw in data.get("top_10", [])[:10]:
         try:
-            top_10.append(TrendSignal(**{
-                k: raw.get(k, "")
-                for k in TrendSignal.model_fields
-                if k in raw
-            }))
+            top_10.append(
+                TrendSignal(**{k: raw.get(k, "") for k in TrendSignal.model_fields if k in raw})
+            )
         except Exception:
             pass
 

@@ -6,6 +6,7 @@ They can be shared across multiple Agent instances (TrendScout, Campaign, etc.).
 
 Tool naming convention: verb_noun (search_xhs, write_xhs_copy, schedule_posts)
 """
+
 from __future__ import annotations
 
 import json
@@ -19,6 +20,7 @@ from agents import function_tool
 # Data Collection Tools
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @function_tool
 def search_xhs(keywords: list[str], limit_per_keyword: int = 20) -> str:
     """
@@ -28,6 +30,7 @@ def search_xhs(keywords: list[str], limit_per_keyword: int = 20) -> str:
     """
     try:
         from nails_agent.tools.fetchers.xhs_mcp_fetcher import XHSMCPFetcher
+
         fetcher = XHSMCPFetcher()
         if not fetcher.is_available():
             return json.dumps({"error": "XHS MCP server not running", "signals": []})
@@ -44,7 +47,9 @@ def search_xhs(keywords: list[str], limit_per_keyword: int = 20) -> str:
                 unique.append(s)
             elif not tid:
                 unique.append(s)
-        return json.dumps({"count": len(unique), "signals": unique}, ensure_ascii=False, default=str)
+        return json.dumps(
+            {"count": len(unique), "signals": unique}, ensure_ascii=False, default=str
+        )
     except Exception as exc:
         return json.dumps({"error": str(exc), "signals": []})
 
@@ -57,11 +62,13 @@ def search_douyin(keywords: list[str], limit_per_keyword: int = 15) -> str:
     """
     try:
         from nails_agent.tools.fetchers.douyin_cdp import DouyinCDPFetcher
+
         fetcher = DouyinCDPFetcher()
         signals = fetcher.search(keywords, limit_per_kw=limit_per_keyword)
         return json.dumps(
             {"count": len(signals), "signals": [s.model_dump() for s in signals]},
-            ensure_ascii=False, default=str,
+            ensure_ascii=False,
+            default=str,
         )
     except Exception as exc:
         return json.dumps({"error": str(exc), "signals": []})
@@ -75,11 +82,13 @@ def search_instagram(tags: list[str], limit_per_tag: int = 15) -> str:
     """
     try:
         from nails_agent.tools.fetchers.instagram_fetcher import InstagramFetcher
+
         fetcher = InstagramFetcher()
         signals = fetcher.search(tags, limit_per_tag=limit_per_tag)
         return json.dumps(
             {"count": len(signals), "signals": [s.model_dump() for s in signals]},
-            ensure_ascii=False, default=str,
+            ensure_ascii=False,
+            default=str,
         )
     except Exception as exc:
         return json.dumps({"error": str(exc), "signals": []})
@@ -105,6 +114,7 @@ def get_style_library() -> str:
 # Copywriting Tools (for CampaignAgent)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @function_tool
 def check_xhs_compliance(copy_text: str) -> str:
     """
@@ -112,18 +122,36 @@ def check_xhs_compliance(copy_text: str) -> str:
     Returns a JSON report: {compliant: bool, violations: [...], suggestion: str}
     """
     banned = [
-        "限时", "爆款", "立即购买", "全网最低", "秒杀", "薅羊毛", "白嫖",
-        "最便宜", "史低价", "绝绝子", "绝了", "YYDS", "内部价", "福利价",
-        "划算", "超值", "不买后悔", "手慢无",
+        "限时",
+        "爆款",
+        "立即购买",
+        "全网最低",
+        "秒杀",
+        "薅羊毛",
+        "白嫖",
+        "最便宜",
+        "史低价",
+        "绝绝子",
+        "绝了",
+        "YYDS",
+        "内部价",
+        "福利价",
+        "划算",
+        "超值",
+        "不买后悔",
+        "手慢无",
     ]
     violations = [w for w in banned if w in copy_text]
     compliant = len(violations) == 0
     suggestion = "" if compliant else f"建议去掉：{', '.join(violations)}"
-    return json.dumps({
-        "compliant": compliant,
-        "violations": violations,
-        "suggestion": suggestion,
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "compliant": compliant,
+            "violations": violations,
+            "suggestion": suggestion,
+        },
+        ensure_ascii=False,
+    )
 
 
 @function_tool
@@ -138,11 +166,14 @@ def load_trend_context(limit: int = 5) -> str:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         style_trends = data.get("style_trends", [])[:limit]
-        return json.dumps({
-            "style_trends": style_trends,
-            "patterns": data.get("patterns", []),
-            "anomalies": data.get("anomalies", []),
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "style_trends": style_trends,
+                "patterns": data.get("patterns", []),
+                "anomalies": data.get("anomalies", []),
+            },
+            ensure_ascii=False,
+        )
     except Exception as exc:
         return json.dumps({"error": str(exc), "style_trends": []})
 

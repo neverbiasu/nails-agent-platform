@@ -1,7 +1,10 @@
 """
-Lightweight tool-use agent loop supporting two backends:
-  • Anthropic SDK  (when ANTHROPIC_API_KEY is set)
-  • OpenAI SDK → OpenRouter  (when OPENROUTER_API_KEY is set, no Anthropic key)
+Lightweight tool-use agent loop supporting three backends:
+  • Anthropic SDK    (when ANTHROPIC_API_KEY is set)
+  • ModelScope API   (when MODELSCOPE_API_KEY is set, OpenAI-compatible)
+  • OpenAI SDK → OpenRouter  (when OPENROUTER_API_KEY is set)
+
+Priority: Anthropic → ModelScope → OpenRouter → none (rule-based fallback)
 
 Both backends follow the same tool_use loop:
   user → assistant → [tool_use → tool_result] → … → end_turn
@@ -14,6 +17,7 @@ Usage:
     )
     result = agent.run("user message", progress_cb=print)
 """
+
 from __future__ import annotations
 
 import json
@@ -34,9 +38,12 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MODEL = os.environ.get("NAILS_AGENT_MODEL", "claude-sonnet-4-5")
 _OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 _OPENROUTER_MODEL = os.environ.get("NAILS_OPENROUTER_MODEL", "anthropic/claude-sonnet-4-5")
+_MODELSCOPE_BASE = os.environ.get("MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1")
+_MODELSCOPE_MODEL = os.environ.get("NAILS_MODELSCOPE_MODEL", "Qwen/Qwen3-235B-A22B-Instruct-2507")
 
 
 # ── Result ─────────────────────────────────────────────────────────────────────
+
 
 class AgentResult:
     def __init__(
@@ -60,27 +67,31 @@ class AgentResult:
 
 # ── Schema conversion ──────────────────────────────────────────────────────────
 
+
 def _anthropic_to_openai_tools(tools: List[Dict]) -> List[Dict]:
     """Convert Anthropic tool schemas to OpenAI function-calling format."""
     result = []
     for t in tools:
-        result.append({
-            "type": "function",
-            "function": {
-                "name": t["name"],
-                "description": t.get("description", ""),
-                "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
-            },
-        })
+        result.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+                },
+            }
+        )
     return result
 
 
 # ── Main agent class ───────────────────────────────────────────────────────────
 
+
 class ToolAgent:
     """
     Backend-agnostic tool-use agent.
-    Automatically selects Anthropic or OpenAI/OpenRouter based on available keys.
+    Automatically selects Anthropic, ModelScope, or OpenRouter based on available keys.
     Tool schemas use Anthropic format (input_schema); converted internally for OpenAI.
     """
 
@@ -101,15 +112,27 @@ class ToolAgent:
         self.max_tokens = max_tokens
 
         anthropic_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        modelscope_key = os.environ.get("MODELSCOPE_API_KEY")
         openrouter_key = os.environ.get("OPENROUTER_API_KEY")
 
         if anthropic_key:
             import anthropic as _ant
+
             self._backend = "anthropic"
             self.model = model
             self._client = _ant.Anthropic(api_key=anthropic_key)
+        elif modelscope_key:
+            import openai as _oai
+
+            self._backend = "openai"
+            self.model = _MODELSCOPE_MODEL
+            self._client = _oai.OpenAI(
+                api_key=modelscope_key,
+                base_url=_MODELSCOPE_BASE,
+            )
         elif openrouter_key:
             import openai as _oai
+
             self._backend = "openai"
             self.model = _OPENROUTER_MODEL
             self._client = _oai.OpenAI(
@@ -134,7 +157,7 @@ class ToolAgent:
                 tool_calls=[],
                 messages=[],
                 duration_s=0.0,
-                error="No API key configured (ANTHROPIC_API_KEY or OPENROUTER_API_KEY)",
+                error="No API key configured (ANTHROPIC_API_KEY, MODELSCOPE_API_KEY, or OPENROUTER_API_KEY)",
             )
 
         if extra_context:
@@ -153,6 +176,7 @@ class ToolAgent:
         progress_cb: Optional[Callable],
     ) -> AgentResult:
         import anthropic as _ant
+
         t0 = time.time()
         messages: List[Dict] = [{"role": "user", "content": user_message}]
         all_tool_calls: List[Dict] = []
@@ -168,8 +192,7 @@ class ToolAgent:
                     messages=messages,
                 )
             except _ant.APIError as e:
-                return AgentResult("", all_tool_calls, messages,
-                                   round(time.time() - t0, 1), str(e))
+                return AgentResult("", all_tool_calls, messages, round(time.time() - t0, 1), str(e))
 
             text_parts = [b.text for b in response.content if hasattr(b, "text")]
             if text_parts:
@@ -185,17 +208,18 @@ class ToolAgent:
                 for tu in tool_uses:
                     result_content = self._call_tool(tu.name, tu.input, progress_cb)
                     all_tool_calls.append({"tool": tu.name, "input": tu.input})
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tu.id,
-                        "content": result_content,
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tu.id,
+                            "content": result_content,
+                        }
+                    )
                 messages.append({"role": "user", "content": tool_results})
             else:
                 break
 
-        return AgentResult(final_text, all_tool_calls, messages,
-                           round(time.time() - t0, 1))
+        return AgentResult(final_text, all_tool_calls, messages, round(time.time() - t0, 1))
 
     # ── OpenAI / OpenRouter backend ────────────────────────────────────────────
 
@@ -215,16 +239,20 @@ class ToolAgent:
 
         for _ in range(self.max_iterations):
             try:
-                response = self._client.chat.completions.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    tools=openai_tools,
-                    messages=messages,
-                    tool_choice="auto",
-                )
+                kwargs: Dict[str, Any] = {
+                    "model": self.model,
+                    "max_tokens": self.max_tokens,
+                    "messages": messages,
+                }
+                if openai_tools:
+                    kwargs["tools"] = openai_tools
+                    kwargs["tool_choice"] = "auto"
+                response = self._client.chat.completions.create(**kwargs)
             except Exception as e:
-                return AgentResult("", all_tool_calls, messages,
-                                   round(time.time() - t0, 1), str(e))
+                return AgentResult("", all_tool_calls, messages, round(time.time() - t0, 1), str(e))
+
+            if not response or not response.choices:
+                break
 
             choice = response.choices[0]
             msg = choice.message
@@ -234,18 +262,23 @@ class ToolAgent:
 
             if choice.finish_reason == "tool_calls" and msg.tool_calls:
                 # Append assistant message with tool_calls
-                messages.append({
-                    "role": "assistant",
-                    "content": msg.content,
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                        }
-                        for tc in msg.tool_calls
-                    ],
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.content,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in msg.tool_calls
+                        ],
+                    }
+                )
 
                 for tc in msg.tool_calls:
                     try:
@@ -254,16 +287,17 @@ class ToolAgent:
                         args = {}
                     result_content = self._call_tool(tc.function.name, args, progress_cb)
                     all_tool_calls.append({"tool": tc.function.name, "input": args})
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": result_content,
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": result_content,
+                        }
+                    )
             else:
                 break  # end_turn / stop
 
-        return AgentResult(final_text, all_tool_calls, messages,
-                           round(time.time() - t0, 1))
+        return AgentResult(final_text, all_tool_calls, messages, round(time.time() - t0, 1))
 
     # ── Shared tool dispatch ───────────────────────────────────────────────────
 

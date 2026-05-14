@@ -1,0 +1,36 @@
+# Local-dev reverse proxy for the nails-agent-platform.
+#
+# Merchant Streamlit is the default landing; consumer V1 lives under /user/.
+# FastAPI is reachable both directly (:8000) and via /api/ for browser-side
+# JS clients (the future Next.js / Vue rewrite will use this).
+
+localhost:8080 {
+    log {
+        output stdout
+        format console
+    }
+
+    # FastAPI under /api/* — strip the prefix before forwarding.
+    handle_path /api/* {
+        reverse_proxy localhost:8000
+    }
+
+    # Consumer V1 Streamlit under /user/*
+    handle_path /user/* {
+        reverse_proxy localhost:8503 {
+            # Streamlit needs websocket support for live reload + components.
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+
+    # Default: merchant Streamlit
+    handle {
+        reverse_proxy localhost:8501 {
+            transport http {
+                versions 1.1
+            }
+        }
+    }
+}

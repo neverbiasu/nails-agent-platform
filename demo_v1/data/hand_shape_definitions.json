@@ -1,0 +1,89 @@
+[
+  {
+    "hand_shape": "unknown",
+    "display_name": "未识别",
+    "description": "未检测到稳定完整的手部关键点。",
+    "feature_rules": {
+      "landmark_visibility_score_lt": 0.70
+    },
+    "center": null,
+    "confidence": 0.0,
+    "reason": "手部关键点不完整",
+    "similar_shapes": [],
+    "priority": 100
+  },
+  {
+    "hand_shape": "square_palm",
+    "display_name": "方掌型",
+    "description": "掌部宽高比较接近，掌形偏方。",
+    "feature_rules": {
+      "landmark_visibility_score_min": 0.70,
+      "palm_width_ratio_min": 0.95
+    },
+    "center": {
+      "finger_to_palm_ratio": 1.12,
+      "palm_width_ratio": 0.98,
+      "hand_aspect_ratio": 2.05
+    },
+    "confidence": 0.84,
+    "reason": "掌宽比例较高，接近方掌",
+    "similar_shapes": ["short_wide"],
+    "priority": 90
+  },
+  {
+    "hand_shape": "slender_long",
+    "display_name": "纤长型",
+    "description": "手指较长，掌宽较窄，整体比例修长。",
+    "feature_rules": {
+      "landmark_visibility_score_min": 0.70,
+      "finger_to_palm_ratio_min": 1.35,
+      "palm_width_ratio_max": 0.82
+    },
+    "center": {
+      "finger_to_palm_ratio": 1.42,
+      "palm_width_ratio": 0.78,
+      "hand_aspect_ratio": 2.55
+    },
+    "confidence": 0.88,
+    "reason": "手指相对掌长更长，掌形偏窄",
+    "similar_shapes": ["narrow_palm"],
+    "priority": 80
+  },
+  {
+    "hand_shape": "narrow_palm",
+    "display_name": "窄掌型",
+    "description": "掌宽较窄，整体细窄。",
+    "feature_rules": {
+      "landmark_visibility_score_min": 0.70,
+      "palm_width_ratio_max": 0.72
+    },
+    "center": {
+      "finger_to_palm_ratio": 1.20,
+      "palm_width_ratio": 0.68,
+      "hand_aspect_ratio": 2.60
+    },
+    "confidence": 0.84,
+    "reason": "掌宽比例较低，整体偏窄",
+    "similar_shapes": ["slender_long"],
+    "priority": 70
+  },
+  {
+    "hand_shape": "short_wide",
+    "display_name": "短宽型",
+    "description": "手掌偏宽，手指相对较短。",
+    "feature_rules": {
+      "landmark_visibility_score_min": 0.70,
+      "finger_to_palm_ratio_max": 1.05,
+      "palm_width_ratio_min": 0.84
+    },
+    "center": {
+      "finger_to_palm_ratio": 1.00,
+      "palm_width_ratio": 0.90,
+      "hand_aspect_ratio": 2.10
+    },
+    "confidence": 0.84,
+    "reason": "手指相对较短，掌宽比例偏高",
+    "similar_shapes": ["square_palm"],
+    "priority": 60
+  }
+]
