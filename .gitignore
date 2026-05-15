@@ -31,11 +31,15 @@ logs/
 *.log
 
 # Generated outputs (pipeline artifacts, not seed data)
-demo/output/
+web/output/
 output/
 outputs/
 reports/
 contexts/
+
+# Remotion / video build artifacts
+video/node_modules/
+video/out/
 
 # Database (runtime)
 *.db
