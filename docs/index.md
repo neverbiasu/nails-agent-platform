@@ -7,6 +7,14 @@
 | [product/prd.md](product/prd.md) | PRD v4：背景、K1–K5 创新点、用户旅程、功能清单、Roadmap |
 | [product/hand_upload_flow.drawio](product/hand_upload_flow.drawio) | C 端手部上传与试戴 6 步流程（draw.io 源文件） |
 
+## 设计文档
+
+| 文件 | 说明 |
+|------|------|
+| [../DESIGN.md](../DESIGN.md) | 设计系统：颜色 token、字体、圆角、间距、组件规格（AI 开发必读） |
+| [design/pages-merchant.md](design/pages-merchant.md) | B端页面设计：AI Chat 界面、Pipeline 状态内嵌、HITL 审批卡 |
+| [design/pages-consumer.md](design/pages-consumer.md) | C端页面设计：首页发现、商家主页、试戴三步流程 |
+
 ## 开发文档
 
 | 文件 | 说明 |
