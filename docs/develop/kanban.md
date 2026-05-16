@@ -33,23 +33,27 @@
 | A10 | Douyin CDP search() 完整实现（3h 预算） | — | P1 | A3 | ✅ 已完成 | `search()` 实现完整（XHR 拦截 + scroll-and-drain）；`tests/test_douyin_cdp.py` 覆盖解析层和 fallback |
 | A11 | Instagram cookie 接入 | — | P2 | A3 | ✅ 已完成 | `developer_guide.md` 补充 instaloader session 生成步骤；`instagram_fetcher.py` 代码已有 |
 | A12 | ValueEvaluator 集成进编排链 | — | P1 | A4 | ✅ 已完成 | Orchestrator Step 2 并行调用 ValueEvaluator；`review_score` 含三维评分贡献；`tests/test_summarizer.py` 验证 |
+| **A13** | **XHS session 刷新 + dev.sh 全栈联调（真实数据接入验收）** | — | **P0** | A9 | 🔲 待开始 | `xhs_login.py` 扫码成功；`dev.sh` 一键启动全部服务（:18060/:8000/:8501/:8503）；POST /api/v1/trigger → GET /api/v1/events 包含 `platform=小红书` 的真实 TrendSignal（非 mock） |
+| **A14** | **后端 E2E acceptance curl 验收** | — | **P0** | A13 | 🔲 待开始 | 按 `docs/develop/acceptance_plan.md` 的 curl 命令逐一通过：trigger → events → review/approve → action/publish；全链路 EventLog 5 种 event_type 均出现 |
 
 ---
 
 ## Track B — Next.js 前端
 
+> **当前阻塞**：`frontend/` 目录不存在，B0 未启动。B0 → B1 是所有前端任务的前置。
+
 | ID | 任务 | 负责人 | 优先级 | 依赖 | 状态 | 完成标志 |
 |----|------|--------|--------|------|------|----------|
-| B0 | Next.js scaffold + shadcn/ui + 路由组 (merchant) + (user) | — | P0 | AB0 | 🔲 待开始 | `npm run dev` 启动无报错；两个路由组可访问 |
-| B1 | lib/api/client.ts + lib/api/types.ts（API 客户端 + 类型定义） | — | P0 | B0, AB0 | 🔲 待开始 | 所有后端 Schema 有对应 TS 类型；client 编译通过 |
-| B2 | Zustand chat store（11 状态机） | — | P0 | B1 | 🔲 待开始 | 状态转移覆盖 idle→triggered→reviewing→done |
-| B3 | /merchant — ChatUI + Trigger 提交 + EventLog 时间线 | — | P0 | B2 | 🔲 待开始 | 提交 trigger 后 UI 展示完整 EventLog 链 |
-| B4 | /merchant/campaign — CandidatePackage 展示 + Reviewer UI（HITL confirm 按钮） | — | P0 | B3 | 🔲 待开始 | HITL 确认按钮调用 /api/v1/review/approve 成功 |
-| B5 | /(user)/upload — react-dropzone 手部图片上传 | — | P0 | B1 | 🔲 待开始 | 拖拽上传图片；返回 upload_id |
-| B6 | /(user)/tryon — TryOn 提交 + TanStack Query 轮询 + 结果展示 | — | P0 | B5 | 🔲 待开始 | 轮询至 status:done 后显示 result_url 图片 |
-| B7 | /(user)/recommend — 相似风格 + 收藏（FeedbackEvent） | — | P1 | B6 | 🔲 待开始 | 收藏操作写入 FeedbackEvent；推荐列表非空 |
-| B8 | 全局布局 + 导航栏 | — | P1 | B0 | 🔲 待开始 | merchant / user 两侧导航可正常跳转 |
-| B9 | Streamlit 共存配置（端口隔离、反向代理） | — | P2 | B0 | 🔲 待开始 | Next.js :3000 与 Streamlit :8501 同时运行无冲突 |
+| **B0** | **Next.js 脚手架 + shadcn/ui + 路由组 `(merchant)` + `(user)`** | — | **P0** | — | 🔲 待开始 | `frontend/` 目录存在；`npm run dev` 启动无报错；两个路由组各返回 200 |
+| **B1** | **`lib/api/client.ts` + `lib/api/types.ts`（API 客户端 + 类型定义）** | — | **P0** | B0 | 🔲 待开始 | 对齐 A2/A7/A8 所有端点的 Pydantic schema；TypeScript 无报错；`fetch('/api/v1/trigger')` 有 baseURL 配置 |
+| B2 | Zustand chat store（B端状态机：idle → triggered → streaming → reviewing → done → error） | — | P0 | B1 | 🔲 待开始 | 状态转移单测通过；HITL 状态下输入框禁用 |
+| B3 | `/merchant` — ChatUI + Trigger 提交 + EventLog 实时轨迹 | — | P0 | B2 | 🔲 待开始 | POST /api/v1/trigger → 2s 轮询 GET /api/v1/events；UI 按顺序展示 TriggerEvent / TrendEvent / StrategyEvent / ReviewEvent |
+| B4 | `/merchant` — CandidatePackage 展示 + HITL Reviewer 卡片 | — | P0 | B3 | 🔲 待开始 | ReviewEvent 出现后渲染 HITL 卡片；通过/修改/拒绝三按钮各调用 POST /api/v1/review/approve 成功 |
+| B5 | `/(user)/upload` — react-dropzone 手部图片上传 | — | P0 | B1 | 🔲 待开始 | 拖拽或点击上传 JPG/PNG；预览图可见；上传成功后跳转试戴页 |
+| B6 | `/(user)/tryon` — TryOn 提交 + TanStack Query 轮询 + 结果图展示 | — | P0 | B5 | 🔲 待开始 | POST /api/v1/tryon/submit → 3s 轮询 GET /api/v1/tryon/{id}；status=done 时 result_url 图片可见 |
+| B7 | `/(user)/recommend` — 相似风格列表 + 收藏（FeedbackEvent） | — | P1 | B6 | 🔲 待开始 | 推荐列表非空；收藏操作 POST /api/v1/events 写入 FeedbackEvent |
+| B8 | 全局布局 + 导航栏（B/C 端切换） | — | P1 | B0 | 🔲 待开始 | Sidebar（B端）+ BottomTabBar（C端）可正常跳转；响应式 |
+| B9 | Streamlit 共存（端口隔离，Caddy 不改） | — | P2 | B0 | 🔲 待开始 | Next.js :3000 与 Streamlit :8501/:8503 同时跑无冲突 |
 
 ---
 
