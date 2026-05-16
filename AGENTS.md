@@ -51,10 +51,11 @@
 
 ## Git 规范
 
-- commit message 不加 `Co-Authored-By: <AI agent>` 行。
+- commit message 不加 `Co-Authored-By` 行。
 - push 前 pre-push hook 自动执行 `ruff check + ruff format + pytest`，失败则修复后再 commit。
 - 不使用 `git push --force`；不跳过 hook（`--no-verify`）。
 - 每次只做一个 KANBAN 任务，完成后写测试，再 push。
+- Remote：`origin` = neverbiasu/nails-agent-platform，`upstream` = ai-contests/nails-agent-platform。日常 push 到 origin，比赛提交 push 到 upstream。
 
 ---
 
