@@ -173,7 +173,8 @@
 
 | 文件 | 说明 |
 |------|------|
-| [dev.sh](../../scripts/dev.sh) | 一键启动：FastAPI（:8000）+ ChatUI（:8501）+ C 端（:8503）+ Caddy（:8080） |
+| [dev.sh](../../scripts/dev.sh) | 一键启动：XHS bridge（:18060）+ FastAPI（:8000）+ ChatUI（:8501）+ C 端（:8503）+ Caddy（:8080） |
+| [xhs_rest_bridge.mjs](../../scripts/xhs_rest_bridge.mjs) | Node.js REST bridge：把 xhs-mcp 内部 API 封装为 REST（/api/v1/feeds/search 等），供 Python 调用 |
 | [xhs_login.py](../../scripts/xhs_login.py) | XHS MCP 账号登录：触发 QR 码扫码，持久化 cookie |
 | [hooks/pre-push](../../scripts/hooks/pre-push) | git pre-push 门禁：ruff check + ruff format + pytest 全部通过才允许 push |
 
