@@ -24,17 +24,23 @@
 
 ## 架构图
 
-> 图片存放于 `docs/assets/`，需手动将以下文件放入该目录。
+### B端 + C端 端到端调用流程（自动生成）
 
-### 平台总览
+![nails-agent-platform-flow](assets/nails-agent-platform-flow.drawio.png)
+
+> draw.io 源文件（含嵌入 XML，可直接在 draw.io 中编辑）：[assets/nails-agent-platform-flow.drawio](assets/nails-agent-platform-flow.drawio)
+
+### 平台总览（待上传）
+
+> 将 Notion 截图放入 `docs/assets/` 后生效。
 
 ![nail_agent_overview_v2](assets/nail_agent_overview_v2.png)
 
-### 多 Agent 协作流（B 端运营链路）
+### 多 Agent 协作流（待上传）
 
 ![collab_v4](assets/collab_v4.png)
 
-### C 端用户上传与试戴流程
+### C 端上传与试戴流程（待上传）
 
 ![hand_upload_flow](assets/hand_upload_flow.png)
 
