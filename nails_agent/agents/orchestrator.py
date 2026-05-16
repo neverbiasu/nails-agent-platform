@@ -45,6 +45,7 @@ from nails_agent.agents.workers import (
 # Agent-powered workers (fall back to rule-based if ANTHROPIC_API_KEY missing)
 from nails_agent.agents.trend_agent import run_trend_scout
 from nails_agent.agents.campaign_agent import run_campaign_agent
+from nails_agent.agents.summarizer import Summarizer
 
 logger = logging.getLogger(__name__)
 
@@ -317,14 +318,18 @@ class PipelineOrchestrator:
             )
             emit(f"✅ Step 3 完成 — {len(campaign.style_cards)} 张策略卡片")
 
-            # ── Step 4: Summary ────────────────────────────────────────────
+            # ── Step 4: Summary Report + CandidatePackage ─────────────────
             emit("⏳ Step 4 生成运营报告…")
             state.step = 4
             report = summarizer.summarise(state)
             state.report = report
             self._persist_report(state.pipeline_id, report)
             self._write_markdown(state.pipeline_id, report.markdown)
-            emit("✅ Step 4 完成")
+
+            # Build CandidatePackage for ReviewerGuardrail
+            agent_summarizer = Summarizer(event_log=self.event_log)
+            candidate = agent_summarizer.summarise(trigger_id=trigger_id, state=state)
+            emit(f"✅ Step 4 完成 — CandidatePackage ready (score={candidate.review_score:.2f})")
 
             new_insights = self.memory.distill(state.pipeline_id)
             if new_insights:
