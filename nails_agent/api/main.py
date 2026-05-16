@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,7 +43,9 @@ from nails_agent.models.schemas import (
     ConsumerTryOnRequest,
 )
 from nails_agent.memory.store import MemoryStore
+from nails_agent.memory.event_log import EventLog
 from nails_agent.agents.orchestrator import PipelineOrchestrator
+from nails_agent.agents.trigger_gateway import TriggerGateway
 from nails_agent.services.style_library import StyleLibrary
 from nails_agent.services.session_service import SessionService, annotated_image_b64
 from nails_agent.services.recommendation import RecommendationService
@@ -57,7 +59,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*", "http://localhost:3000", "http://127.0.0.1:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,6 +68,8 @@ app.add_middleware(
 
 _memory: Optional[MemoryStore] = None
 _orchestrator: Optional[PipelineOrchestrator] = None
+_event_log: Optional[EventLog] = None
+_trigger_gateway: Optional[TriggerGateway] = None
 
 DATA_DIR = os.environ.get("NAILS_DATA_DIR", "web/data")
 OUTPUT_DIR = os.environ.get("NAILS_OUTPUT_DIR", "web/output")
@@ -95,6 +99,20 @@ def get_orchestrator() -> PipelineOrchestrator:
             output_dir=OUTPUT_DIR,
         )
     return _orchestrator
+
+
+def get_event_log() -> EventLog:
+    global _event_log
+    if _event_log is None:
+        _event_log = EventLog()
+    return _event_log
+
+
+def get_trigger_gateway() -> TriggerGateway:
+    global _trigger_gateway
+    if _trigger_gateway is None:
+        _trigger_gateway = TriggerGateway()
+    return _trigger_gateway
 
 
 # ── Consumer-side service singletons ──────────────────────────────────────────
@@ -131,6 +149,44 @@ def get_interaction_service() -> InteractionService:
     if _interaction_service is None:
         _interaction_service = InteractionService(get_memory(), get_style_library())
     return _interaction_service
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MVP B-end pipeline API  (v1)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TriggerRequest(BaseModel):
+    source: str = "manual"
+    keywords: List[str] = []
+    goal: Optional[str] = None
+    shop_data: Dict[str, Any] = {}
+
+
+class TriggerResponse(BaseModel):
+    trigger_id: str
+    status: str = "queued"
+
+
+@app.post("/api/v1/trigger", response_model=TriggerResponse)
+async def trigger_pipeline(req: TriggerRequest, background_tasks: BackgroundTasks):
+    """Fire a new pipeline run. Returns trigger_id immediately; pipeline runs in background."""
+    gw = get_trigger_gateway()
+    event = gw.fire(
+        source=req.source,
+        keywords=req.keywords,
+        goal=req.goal,
+        shop_data=req.shop_data,
+    )
+    # A3 will wire up run_pipeline() here; for now TriggerEvent is written to EventLog.
+    return TriggerResponse(trigger_id=event.trigger_id)
+
+
+@app.get("/api/v1/events")
+async def list_events(trigger_id: str, limit: int = 50, offset: int = 0):
+    """Poll EventLog entries for a given trigger_id (for frontend SSE simulation)."""
+    entries = get_event_log().list_by_trigger(trigger_id, limit=limit, offset=offset)
+    return {"events": [e.model_dump() for e in entries]}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
