@@ -34,7 +34,7 @@
 #   POST /api/v1/tryon/submit     提交试戴任务
 #   GET  /api/v1/tryon/{job_id}   轮询试戴结果
 
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -68,7 +68,7 @@ if c.fetchone()[0] == 0:
     raise SystemExit(1)
 " 2>/dev/null; then
   echo "→ seeding SQLite style library…"
-  python -m nails_agent.services.seed_loader
+  python -m nails_agent.services.seed_loader || true
 fi
 
 # ── Cleanup on exit ──────────────────────────────────────────────────────────

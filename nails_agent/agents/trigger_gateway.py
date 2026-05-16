@@ -22,8 +22,12 @@ AGENT_ID = "TriggerGateway"
 
 
 class TriggerGateway:
-    def __init__(self, db_path: Optional[Path] = None):
-        self._event_log = EventLog(db_path=db_path)
+    def __init__(
+        self,
+        event_log: Optional[EventLog] = None,
+        db_path: Optional[Path] = None,
+    ):
+        self._event_log = event_log or EventLog(db_path=db_path)
 
     def fire(
         self,

@@ -11,8 +11,9 @@
  *   GET  /api/v1/feeds/search?keyword=<kw>[&count=<n>]
  *   GET  /api/v1/feeds/list[?count=<n>]
  *
- * Must run under Node.js v22 (not Bun) — better-sqlite3 is compiled for
- * Node.js ABI 131.  Bun uses ABI 137 and cannot load the same binary.
+ * Must run under Node.js v22+ (not Bun) — better-sqlite3 is compiled for
+ * Node.js ABI 131 (Node v22–v23).  Bun uses ABI 137 and cannot load the
+ * same binary.  dev.sh auto-selects Node v23.1.0 when available via NVM.
  *
  * Usage (dev.sh starts this automatically):
  *   node scripts/xhs_rest_bridge.mjs [--port 18060]
