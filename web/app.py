@@ -28,13 +28,15 @@ st.markdown(
 st.divider()
 
 # Main tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🏠 概览",
-    "📊 趋势感知",
-    "💅 AI 试戴",
-    "🎯 智能运营",
-    "📋 数据链路",
-])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [
+        "🏠 概览",
+        "📊 趋势感知",
+        "💅 AI 试戴",
+        "🎯 智能运营",
+        "📋 数据链路",
+    ]
+)
 
 with tab1:
     tab_overview.render()

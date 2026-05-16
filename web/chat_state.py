@@ -7,6 +7,7 @@ a rerun lives in st.session_state under one well-known key.
 
 Convention: only the runner *appends* events; only the UI *reads* them.
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -19,12 +20,12 @@ _STORE_KEY = "_chat_event_store"
 
 def _default_state() -> Dict[str, Any]:
     return {
-        "events": [],                # List[ChatEvent]    — replay source
-        "phase": "idle",             # Phase              — current state machine position
-        "pending_choice": None,      # dict | None        — UI click → runner input
+        "events": [],  # List[ChatEvent]    — replay source
+        "phase": "idle",  # Phase              — current state machine position
+        "pending_choice": None,  # dict | None        — UI click → runner input
         "pending_interrupt": False,  # bool               — graceful interrupt flag
-        "context": {},               # dict               — runner scratch (signals, etc.)
-        "start_time": None,          # float | None       — epoch for elapsed_ms
+        "context": {},  # dict               — runner scratch (signals, etc.)
+        "start_time": None,  # float | None       — epoch for elapsed_ms
         # User toggles
         "auto_mode": False,
         "dev_mode": False,
@@ -65,8 +66,9 @@ def replay(store: Dict[str, Any]) -> List[ChatEvent]:
     return store["events"]
 
 
-def queue_choice(store: Dict[str, Any], checkpoint_id: Phase,
-                 choice_id: str, form: Optional[dict] = None) -> None:
+def queue_choice(
+    store: Dict[str, Any], checkpoint_id: Phase, choice_id: str, form: Optional[dict] = None
+) -> None:
     store["pending_choice"] = {
         "checkpoint_id": checkpoint_id,
         "choice_id": choice_id,

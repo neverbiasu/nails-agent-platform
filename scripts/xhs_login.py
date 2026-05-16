@@ -15,8 +15,13 @@ Flow:
 Usage:
     uv run python scripts/xhs_login.py --name nails
 """
+
 from __future__ import annotations
-import argparse, json, sqlite3, time, uuid
+import argparse
+import json
+import sqlite3
+import time
+import uuid
 from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright
 
@@ -54,8 +59,9 @@ def login_and_save(name: str, max_wait_s: int = 300) -> None:
         page = ctx.new_page()
 
         print("→ Opening XHS explore page…")
-        page.goto("https://www.xiaohongshu.com/explore",
-                  wait_until="domcontentloaded", timeout=20000)
+        page.goto(
+            "https://www.xiaohongshu.com/explore", wait_until="domcontentloaded", timeout=20000
+        )
         time.sleep(2)
 
         # Remove cookie banner if any
@@ -88,17 +94,22 @@ def login_and_save(name: str, max_wait_s: int = 300) -> None:
 
             cookies = ctx.cookies()
             n_cookies = len(cookies)
-            print(f"  [{(i+1)*5:3d}s] login-btn visible: {login_btn_visible}  cookies: {n_cookies}")
+            print(
+                f"  [{(i + 1) * 5:3d}s] login-btn visible: {login_btn_visible}  cookies: {n_cookies}"
+            )
 
             if not login_btn_visible:
                 logged_in = True
-                print(f"  ✓ #login-btn gone → real login detected!")
+                print("  ✓ #login-btn gone → real login detected!")
                 # Wait extra time for XHS to fully establish session cookies
-                print(f"  → Waiting 15s for XHS to write all auth cookies…")
+                print("  → Waiting 15s for XHS to write all auth cookies…")
                 # Navigate to a logged-in page to force cookie refresh
                 try:
-                    page.goto("https://www.xiaohongshu.com/explore",
-                              wait_until="domcontentloaded", timeout=10000)
+                    page.goto(
+                        "https://www.xiaohongshu.com/explore",
+                        wait_until="domcontentloaded",
+                        timeout=10000,
+                    )
                     time.sleep(5)
                     # Click on a user-only area to trigger more auth cookies
                     page.evaluate("""() => window.scrollTo(0, 500)""")
@@ -117,12 +128,12 @@ def login_and_save(name: str, max_wait_s: int = 300) -> None:
         # Capture session
         state = ctx.storage_state()
         state["cookies"] = [
-            c for c in state["cookies"]
+            c
+            for c in state["cookies"]
             if any(d in c.get("domain", "") for d in ["xiaohongshu.com", "xhscdn.com"])
         ]
         state["origins"] = [
-            o for o in state.get("origins", [])
-            if "xiaohongshu" in o.get("origin", "")
+            o for o in state.get("origins", []) if "xiaohongshu" in o.get("origin", "")
         ]
         print(f"\n→ Captured {len(state['cookies'])} XHS cookies")
         print(f"   names: {[c['name'] for c in state['cookies']]}")

@@ -39,12 +39,17 @@ def render():
     logs = load_event_log()
 
     # Gantt-style chart via Altair
-    df_gantt = pd.DataFrame([{
-        "Agent": e["source_agent"],
-        "事件类型": e["event_type"],
-        "时间": _parse_ts(e["timestamp"]),
-        "摘要": e["payload"].get("summary", ""),
-    } for e in logs])
+    df_gantt = pd.DataFrame(
+        [
+            {
+                "Agent": e["source_agent"],
+                "事件类型": e["event_type"],
+                "时间": _parse_ts(e["timestamp"]),
+                "摘要": e["payload"].get("summary", ""),
+            }
+            for e in logs
+        ]
+    )
 
     # Map agents to y-axis position
     agent_rank = {a: i for i, a in enumerate(AGENT_ORDER)}
@@ -57,11 +62,13 @@ def render():
         .encode(
             x=alt.X("时间:T", title="时间", axis=alt.Axis(format="%H:%M:%S")),
             y=alt.Y("Agent:N", sort=AGENT_ORDER, title="Agent"),
-            color=alt.Color("事件类型:N",
-                            scale=alt.Scale(
-                                domain=list(EVENT_COLOR.keys()),
-                                range=list(EVENT_COLOR.values()),
-                            )),
+            color=alt.Color(
+                "事件类型:N",
+                scale=alt.Scale(
+                    domain=list(EVENT_COLOR.keys()),
+                    range=list(EVENT_COLOR.values()),
+                ),
+            ),
             tooltip=["Agent", "事件类型", "时间:T", "摘要"],
         )
         .properties(height=280, title="流水线事件时间线")
@@ -77,13 +84,18 @@ def render():
 
     # Full event log table
     st.subheader("事件明细")
-    df_table = pd.DataFrame([{
-        "ID": e["event_id"],
-        "时间": e["timestamp"][11:19],
-        "Agent": e["source_agent"],
-        "事件": e["event_type"],
-        "摘要": e["payload"].get("summary", ""),
-    } for e in logs])
+    df_table = pd.DataFrame(
+        [
+            {
+                "ID": e["event_id"],
+                "时间": e["timestamp"][11:19],
+                "Agent": e["source_agent"],
+                "事件": e["event_type"],
+                "摘要": e["payload"].get("summary", ""),
+            }
+            for e in logs
+        ]
+    )
 
     event = st.dataframe(
         df_table,

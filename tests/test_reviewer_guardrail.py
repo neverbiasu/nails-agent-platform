@@ -1,7 +1,7 @@
 """Tests for ReviewerGuardrail rule layer — all 3 status outcomes (A5)."""
+
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,7 +18,9 @@ def guardrail(tmp_path: Path) -> ReviewerGuardrail:
     return ReviewerGuardrail(event_log=el)
 
 
-def _pkg(trigger_id: str, score: float, trend: str = "法式甲渐变色", strategy: str = "周末发布") -> CandidatePackage:
+def _pkg(
+    trigger_id: str, score: float, trend: str = "法式甲渐变色", strategy: str = "周末发布"
+) -> CandidatePackage:
     pkg = CandidatePackage(
         trigger_id=trigger_id,
         trend_summary=trend,

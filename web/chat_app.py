@@ -4,6 +4,7 @@ Agent Chat — Streamlit entry point.
 Run:
     uv run streamlit run web/chat_app.py
 """
+
 from __future__ import annotations
 
 import streamlit as st
@@ -11,6 +12,7 @@ import streamlit as st
 # Make sibling files importable
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 import chat_state
@@ -94,8 +96,7 @@ for event in chat_state.replay(store):
 if pending_text := store.get("pending_start"):
     store["pending_start"] = None
     with st.spinner("正在准备…（首次启动会检查数据源，可能 5–10s）"):
-        action = UserAction(type="start",
-                            payload={"text": pending_text, "skip_user_bubble": True})
+        action = UserAction(type="start", payload={"text": pending_text, "skip_user_bubble": True})
         new_events = runner.advance(action, store)
     chat_state.append_events(store, new_events)
     st.rerun()
@@ -111,7 +112,11 @@ if pending is not None:
 
 # 3) Graceful interrupt — only honour at quiet states; active phases poll the flag.
 if store["pending_interrupt"] and store["phase"] in (
-    "idle", "plan_review", "trends_review", "strategy_review", "done"
+    "idle",
+    "plan_review",
+    "trends_review",
+    "strategy_review",
+    "done",
 ):
     new_events = runner.advance(UserAction(type="interrupt"), store)
     store["pending_interrupt"] = False
@@ -132,6 +137,7 @@ if prompt:
         store = chat_state.init(st.session_state)
     # Two-phase commit: show user bubble first, then process on next rerun.
     from nails_agent.agents.chat_events import make_message
+
     chat_state.append_events(store, [make_message("user", prompt)])
     store["pending_start"] = prompt
     st.rerun()

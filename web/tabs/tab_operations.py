@@ -46,13 +46,18 @@ def _tab_modules():
 def _tab_actions():
     st.subheader("动作执行记录")
     actions = load_action_executions()
-    df = pd.DataFrame([{
-        "ID": a["action_id"],
-        "动作": a["action_name"],
-        "款式": a.get("style_id", "-"),
-        "状态": STATUS_BADGE.get(a["status"], "?") + " " + a["status"],
-        "耗时": _duration(a.get("created_at"), a.get("finished_at")),
-    } for a in actions])
+    df = pd.DataFrame(
+        [
+            {
+                "ID": a["action_id"],
+                "动作": a["action_name"],
+                "款式": a.get("style_id", "-"),
+                "状态": STATUS_BADGE.get(a["status"], "?") + " " + a["status"],
+                "耗时": _duration(a.get("created_at"), a.get("finished_at")),
+            }
+            for a in actions
+        ]
+    )
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     st.divider()
@@ -77,7 +82,7 @@ def _tab_cards():
     # Show all cards in a 4-column grid
     cols_per_row = 4
     for i in range(0, len(cards), cols_per_row):
-        row_cards = cards[i:i + cols_per_row]
+        row_cards = cards[i : i + cols_per_row]
         cols = st.columns(cols_per_row)
         for col, card in zip(cols, row_cards):
             with col:
@@ -109,15 +114,17 @@ def _tab_campaign():
     for card in cards:
         sch = card.get("schedule", {})
         priority = sch.get("priority", "P2")
-        schedule_data.append({
-            "款式": card["style_name"],
-            "优先级": PRIORITY_COLOR.get(priority, "") + " " + priority,
-            "评分": f"{card['launch_priority_score']:.1f}",
-            "小红书发布": sch.get("xiaohongshu_publish_at", "-")[:10],
-            "抖音发布": sch.get("douyin_publish_at", "-")[:10],
-            "Instagram": sch.get("instagram_publish_at", "-")[:10],
-            "基础价": card.get("pricing", {}).get("base_price", "-"),
-        })
+        schedule_data.append(
+            {
+                "款式": card["style_name"],
+                "优先级": PRIORITY_COLOR.get(priority, "") + " " + priority,
+                "评分": f"{card['launch_priority_score']:.1f}",
+                "小红书发布": sch.get("xiaohongshu_publish_at", "-")[:10],
+                "抖音发布": sch.get("douyin_publish_at", "-")[:10],
+                "Instagram": sch.get("instagram_publish_at", "-")[:10],
+                "基础价": card.get("pricing", {}).get("base_price", "-"),
+            }
+        )
 
     df = pd.DataFrame(schedule_data)
     st.dataframe(df, use_container_width=True, hide_index=True)
@@ -133,7 +140,9 @@ def _tab_campaign():
     col3.metric("🟢 P2 待定", len(p2))
     col4.metric("📊 本轮评估", len(cards))
 
-    st.info("💡 建议：本周重点推广猫眼系列（猫眼美甲 + 冰透蓝猫眼），小红书+抖音联动发布，预计触达用户 15 万+")
+    st.info(
+        "💡 建议：本周重点推广猫眼系列（猫眼美甲 + 冰透蓝猫眼），小红书+抖音联动发布，预计触达用户 15 万+"
+    )
 
 
 def _duration(start: str, end: str) -> str:
@@ -141,6 +150,7 @@ def _duration(start: str, end: str) -> str:
         return "-"
     try:
         from datetime import datetime
+
         fmt = "%Y-%m-%dT%H:%M:%S+08:00"
         s = datetime.strptime(start, fmt)
         e = datetime.strptime(end, fmt)

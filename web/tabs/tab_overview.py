@@ -47,10 +47,15 @@ def render():
     # Recent event log
     st.subheader("📋 最近事件")
     recent = logs[-6:][::-1]
-    df = pd.DataFrame([{
-        "时间": e["timestamp"][11:19],
-        "Agent": e["source_agent"],
-        "事件": e["event_type"],
-        "摘要": e["payload"].get("summary", ""),
-    } for e in recent])
+    df = pd.DataFrame(
+        [
+            {
+                "时间": e["timestamp"][11:19],
+                "Agent": e["source_agent"],
+                "事件": e["event_type"],
+                "摘要": e["payload"].get("summary", ""),
+            }
+            for e in recent
+        ]
+    )
     st.dataframe(df, use_container_width=True, hide_index=True)

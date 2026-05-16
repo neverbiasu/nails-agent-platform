@@ -23,6 +23,7 @@ if not os.environ.get("COMFYUI_API_KEY"):
 
 try:
     from comfyui_client import ComfyUIClient
+
     _CLIENT_AVAILABLE = True
 except ImportError:
     _CLIENT_AVAILABLE = False
@@ -68,12 +69,22 @@ def generate_tryon(style_item: dict) -> dict:
     fallback = NAIL_REF_PATH
 
     if not _CLIENT_AVAILABLE:
-        return {"success": False, "image_url": None, "fallback_url": fallback,
-                "error": "ComfyUI client not available", "duration_s": 0.0}
+        return {
+            "success": False,
+            "image_url": None,
+            "fallback_url": fallback,
+            "error": "ComfyUI client not available",
+            "duration_s": 0.0,
+        }
 
     if not WORKFLOW_PATH.exists():
-        return {"success": False, "image_url": None, "fallback_url": fallback,
-                "error": f"Workflow file not found: {WORKFLOW_PATH}", "duration_s": 0.0}
+        return {
+            "success": False,
+            "image_url": None,
+            "fallback_url": fallback,
+            "error": f"Workflow file not found: {WORKFLOW_PATH}",
+            "duration_s": 0.0,
+        }
 
     try:
         client = ComfyUIClient()
@@ -134,5 +145,10 @@ def generate_tryon(style_item: dict) -> dict:
         }
 
     except Exception as exc:
-        return {"success": False, "image_url": None, "fallback_url": fallback,
-                "error": str(exc), "duration_s": round(time.time() - t0, 1)}
+        return {
+            "success": False,
+            "image_url": None,
+            "fallback_url": fallback,
+            "error": str(exc),
+            "duration_s": round(time.time() - t0, 1),
+        }

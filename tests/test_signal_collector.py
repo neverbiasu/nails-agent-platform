@@ -1,4 +1,5 @@
 """Unit tests for SignalCollector (mock data, no network required)."""
+
 from __future__ import annotations
 
 from nails_agent.tools.fetchers.signal_collector import SignalCollector

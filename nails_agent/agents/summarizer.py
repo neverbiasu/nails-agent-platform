@@ -49,10 +49,11 @@ class Summarizer:
 
         # ── Build strategy ────────────────────────────────────────────────────
         if campaign and campaign.style_cards:
-            p0_cards = [c for c in campaign.style_cards if c.schedule and c.schedule.priority == "P0"]
+            p0_cards = [
+                c for c in campaign.style_cards if c.schedule and c.schedule.priority == "P0"
+            ]
             strategy = campaign.executive_summary or (
-                f"共 {len(campaign.style_cards)} 张运营卡片，"
-                f"其中 {len(p0_cards)} 张 P0 立即上线。"
+                f"共 {len(campaign.style_cards)} 张运营卡片，其中 {len(p0_cards)} 张 P0 立即上线。"
             )
         else:
             strategy = "策略生成中"
@@ -83,7 +84,9 @@ class Summarizer:
             trigger_id=trigger_id,
             agent_id=AGENT_ID,
         )
-        logger.info("Summarizer: CandidatePackage saved (trigger=%s, score=%.2f)", trigger_id, review_score)
+        logger.info(
+            "Summarizer: CandidatePackage saved (trigger=%s, score=%.2f)", trigger_id, review_score
+        )
         return pkg
 
     def _compute_review_score(self, state: PipelineState) -> float:

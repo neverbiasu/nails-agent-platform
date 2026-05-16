@@ -6,6 +6,7 @@ The store is passed in for two reasons:
   • dev_mode toggle (controls traceback visibility)
   • queue_choice / request_interrupt callbacks from button widgets
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -18,6 +19,7 @@ import chat_state
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
+
 def render_event(event: ChatEvent, store: Dict[str, Any]) -> None:
     fn = _RENDERERS.get(event.type)
     if fn is None:
@@ -27,6 +29,7 @@ def render_event(event: ChatEvent, store: Dict[str, Any]) -> None:
 
 
 # ── Per-type renderers ────────────────────────────────────────────────────────
+
 
 def _render_message(event: ChatEvent, store: Dict[str, Any]) -> None:
     p = event.payload
@@ -54,7 +57,7 @@ def _render_tool_call(event: ChatEvent, store: Dict[str, Any]) -> None:
 
 def _render_phase_enter(event: ChatEvent, store: Dict[str, Any]) -> None:
     p = event.payload
-    elapsed = f"({p.elapsed_ms/1000:.1f}s)" if p.elapsed_ms else ""
+    elapsed = f"({p.elapsed_ms / 1000:.1f}s)" if p.elapsed_ms else ""
     st.markdown(f"---\n#### {p.title} {elapsed}")
 
 
@@ -76,6 +79,7 @@ def _render_phase_output(event: ChatEvent, store: Dict[str, Any]) -> None:
 
 def _render_table(data) -> None:
     import pandas as pd
+
     st.markdown(f"**{data.title}**")
     df = pd.DataFrame(data.rows, columns=data.columns)
     st.dataframe(df, use_container_width=True, hide_index=True)
@@ -83,30 +87,39 @@ def _render_table(data) -> None:
 
 def _render_chart(data) -> None:
     import plotly.graph_objects as go
+
     st.markdown(f"**{data.title}**")
     if data.chart_type == "bar":
-        fig = go.Figure(go.Bar(
-            x=data.x, y=data.y, orientation="h" if isinstance(data.y[0], str) else "v",
-            marker_color="#FF6B9D",
-            text=[f"{v:.0f}" if isinstance(v, (int, float)) else str(v)
-                  for v in (data.x if isinstance(data.y[0], str) else data.y)],
-            textposition="outside",
-        ))
+        fig = go.Figure(
+            go.Bar(
+                x=data.x,
+                y=data.y,
+                orientation="h" if isinstance(data.y[0], str) else "v",
+                marker_color="#FF6B9D",
+                text=[
+                    f"{v:.0f}" if isinstance(v, (int, float)) else str(v)
+                    for v in (data.x if isinstance(data.y[0], str) else data.y)
+                ],
+                textposition="outside",
+            )
+        )
     elif data.chart_type == "radar":
-        fig = go.Figure(go.Scatterpolar(
-            r=data.y, theta=data.labels or data.x, fill="toself",
-            line_color="#FF6B9D",
-        ))
+        fig = go.Figure(
+            go.Scatterpolar(
+                r=data.y,
+                theta=data.labels or data.x,
+                fill="toself",
+                line_color="#FF6B9D",
+            )
+        )
     elif data.chart_type == "line":
-        fig = go.Figure(go.Scatter(x=data.x, y=data.y, mode="lines+markers",
-                                    line_color="#FF6B9D"))
+        fig = go.Figure(go.Scatter(x=data.x, y=data.y, mode="lines+markers", line_color="#FF6B9D"))
     elif data.chart_type == "pie":
         fig = go.Figure(go.Pie(labels=data.labels or data.x, values=data.y))
     else:
         st.warning(f"Unsupported chart_type: {data.chart_type}")
         return
-    fig.update_layout(height=320, margin=dict(l=10, r=20, t=10, b=10),
-                      plot_bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(height=320, margin=dict(l=10, r=20, t=10, b=10), plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -120,7 +133,7 @@ def _render_gallery(data) -> None:
     cols_per_row = 4
     items = data.items
     for i in range(0, len(items), cols_per_row):
-        row = items[i:i + cols_per_row]
+        row = items[i : i + cols_per_row]
         cols = st.columns(len(row))
         for col, item in zip(cols, row):
             with col:
@@ -187,23 +200,32 @@ def _render_checkpoint(event: ChatEvent, store: Dict[str, Any]) -> None:
                     key = f"cp_{event.event_id}_{choice.id}_{field.name}"
                     if field.type == "text":
                         form_values[field.name] = st.text_input(
-                            field.label, value=str(field.default or ""), key=key,
+                            field.label,
+                            value=str(field.default or ""),
+                            key=key,
                         )
                     elif field.type == "number":
                         form_values[field.name] = st.number_input(
-                            field.label, value=int(field.default or 0), key=key,
+                            field.label,
+                            value=int(field.default or 0),
+                            key=key,
                         )
                     elif field.type == "multiselect":
                         form_values[field.name] = st.multiselect(
-                            field.label, options=field.options or [],
-                            default=field.default or [], key=key,
+                            field.label,
+                            options=field.options or [],
+                            default=field.default or [],
+                            key=key,
                         )
             label = choice.label
             if choice.priority == "P1" and store.get("auto_mode"):
                 label = f"{label}  ·  P1 自动"
-            if st.button(label, type=btn_type_map[choice.style],
-                          key=f"cp_{event.event_id}_{choice.id}",
-                          use_container_width=True):
+            if st.button(
+                label,
+                type=btn_type_map[choice.style],
+                key=f"cp_{event.event_id}_{choice.id}",
+                use_container_width=True,
+            ):
                 store.pop(auto_key, None)  # cancel any running timer
                 chat_state.queue_choice(store, p.phase, choice.id, form_values)
                 st.rerun()
@@ -217,7 +239,7 @@ def _is_checkpoint_open(event: ChatEvent, store: Dict[str, Any]) -> bool:
     except StopIteration:
         return True
     # Anything after the checkpoint that signals progress closes it
-    for later in events[idx + 1:]:
+    for later in events[idx + 1 :]:
         if later.type in ("phase_enter", "checkpoint", "error"):
             return False
     return True
@@ -240,23 +262,23 @@ def _render_error(event: ChatEvent, store: Dict[str, Any]) -> None:
     if p.recoverable and _is_checkpoint_open(event, store):
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 重试", key=f"retry_{event.event_id}",
-                          type="primary", use_container_width=True):
+            if st.button(
+                "🔄 重试", key=f"retry_{event.event_id}", type="primary", use_container_width=True
+            ):
                 chat_state.queue_choice(store, p.phase, "retry")
                 st.rerun()
         with col2:
-            if st.button("✗ 中止", key=f"abort_{event.event_id}",
-                          use_container_width=True):
+            if st.button("✗ 中止", key=f"abort_{event.event_id}", use_container_width=True):
                 chat_state.queue_choice(store, p.phase, "abort")
                 st.rerun()
 
 
 _RENDERERS = {
-    "message":       _render_message,
-    "tool_call":     _render_tool_call,
-    "phase_enter":   _render_phase_enter,
-    "phase_output":  _render_phase_output,
-    "checkpoint":    _render_checkpoint,
-    "progress":      _render_progress,
-    "error":         _render_error,
+    "message": _render_message,
+    "tool_call": _render_tool_call,
+    "phase_enter": _render_phase_enter,
+    "phase_output": _render_phase_output,
+    "checkpoint": _render_checkpoint,
+    "progress": _render_progress,
+    "error": _render_error,
 }

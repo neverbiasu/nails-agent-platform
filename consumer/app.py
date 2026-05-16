@@ -6,12 +6,12 @@ backend at NAILS_API_BASE (default: http://localhost:8000). It will be
 replaced by the Next.js / Vue rewrite; for now this proves the API surface
 and gives QA something to click.
 """
+
 from __future__ import annotations
 
 import base64
 import os
 from html import escape
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -64,27 +64,55 @@ st.markdown(
 # ── Static label maps (mirrors backend; cheap to duplicate) ───────────────────
 
 HAND_SHAPE_LABELS = {
-    "slender_long": "纤长型", "short_wide": "短宽型", "square_palm": "方掌型",
-    "narrow_palm": "窄掌型", "unknown": "未识别",
+    "slender_long": "纤长型",
+    "short_wide": "短宽型",
+    "square_palm": "方掌型",
+    "narrow_palm": "窄掌型",
+    "unknown": "未识别",
 }
 SKIN_TONE_LABELS = {
-    "cool_fair": "冷白", "warm_fair": "暖白", "natural": "自然肤色",
-    "warm_yellow": "暖黄", "wheat": "小麦色", "deep": "深肤色", "unknown": "未识别",
+    "cool_fair": "冷白",
+    "warm_fair": "暖白",
+    "natural": "自然肤色",
+    "warm_yellow": "暖黄",
+    "wheat": "小麦色",
+    "deep": "深肤色",
+    "unknown": "未识别",
 }
 UNDERTONE_LABELS = {
-    "warm": "暖调", "cool": "冷调", "neutral": "中性", "unknown": "未识别",
+    "warm": "暖调",
+    "cool": "冷调",
+    "neutral": "中性",
+    "unknown": "未识别",
 }
 COLOR_FAMILY_LABELS = {
-    "red": "红色系", "pink": "粉色系", "nude": "裸色系", "white": "白色系",
-    "black": "黑色系", "green": "绿色系", "blue": "蓝色系", "purple": "紫色系",
-    "gold_silver": "金银色系", "multi": "多色系", "unknown": "未知色系",
+    "red": "红色系",
+    "pink": "粉色系",
+    "nude": "裸色系",
+    "white": "白色系",
+    "black": "黑色系",
+    "green": "绿色系",
+    "blue": "蓝色系",
+    "purple": "紫色系",
+    "gold_silver": "金银色系",
+    "multi": "多色系",
+    "unknown": "未知色系",
 }
 COLOR_TEMP_LABELS = {
-    "warm": "暖色", "cool": "冷色", "neutral": "中性色", "mixed": "混合色", "unknown": "未知",
+    "warm": "暖色",
+    "cool": "冷色",
+    "neutral": "中性色",
+    "mixed": "混合色",
+    "unknown": "未知",
 }
 LEVEL_LABELS = {
-    "light": "浅明度", "medium": "中等", "dark": "深明度", "low": "低",
-    "high": "高", "mixed": "混合", "unknown": "未知",
+    "light": "浅明度",
+    "medium": "中等",
+    "dark": "深明度",
+    "low": "低",
+    "high": "高",
+    "mixed": "混合",
+    "unknown": "未知",
 }
 
 
@@ -167,7 +195,7 @@ def style_card(
     if visual_score:
         visual_line = (
             f'<div class="small-muted">视觉相似：<span class="score">{visual_score}</span> · '
-            f'调色板 {item.get("palette_similarity_score", 0)}</div>'
+            f"调色板 {item.get('palette_similarity_score', 0)}</div>"
         )
 
     with st.container(border=True):
@@ -177,29 +205,39 @@ def style_card(
             f'<div class="style-title">#{item["rank"]} {escape(style.get("title", item["style_id"]))}</div>'
             f'<div class="style-meta">{escape(style.get("style_id", ""))} · '
             f'<span class="score">{item["total_score"]}</span> 分</div>'
-            f'{pill_html(item.get("reason_tags", []), hot=True)}'
+            f"{pill_html(item.get('reason_tags', []), hot=True)}"
             f'<div class="small-muted">主色：{escape(primary_color)} · {escape(family_label)} · {escape(temp_label)}</div>'
             f'<div class="small-muted">明暗/饱和：{escape(brightness_label)} · {escape(saturation_label)}</div>'
-            f'{visual_line}'
+            f"{visual_line}"
             f'<div class="small-muted" style="margin-top:0.35rem;">{escape(item.get("reason_text", ""))}</div>',
             unsafe_allow_html=True,
         )
         c1, c2 = st.columns(2)
-        if c1.button("点击", key=f"{button_prefix}_click_{snapshot_id}_{item['style_id']}", width="stretch"):
-            api_post(f"/sessions/{session_id}/events", json_body={
-                "style_id": item["style_id"],
-                "event_type": "click",
-                "source_snapshot_id": snapshot_id,
-            })
+        if c1.button(
+            "点击", key=f"{button_prefix}_click_{snapshot_id}_{item['style_id']}", width="stretch"
+        ):
+            api_post(
+                f"/sessions/{session_id}/events",
+                json_body={
+                    "style_id": item["style_id"],
+                    "event_type": "click",
+                    "source_snapshot_id": snapshot_id,
+                },
+            )
             st.toast(f"已记录点击：{style.get('title', '')}")
             st.rerun()
-        if c2.button("试戴", key=f"{button_prefix}_try_{snapshot_id}_{item['style_id']}", width="stretch"):
+        if c2.button(
+            "试戴", key=f"{button_prefix}_try_{snapshot_id}_{item['style_id']}", width="stretch"
+        ):
             with st.spinner("ComfyUI 试戴中（约 30–60 秒）..."):
                 try:
-                    job = api_post(f"/sessions/{session_id}/tryon", json_body={
-                        "style_id": item["style_id"],
-                        "source_snapshot_id": snapshot_id,
-                    })
+                    job = api_post(
+                        f"/sessions/{session_id}/tryon",
+                        json_body={
+                            "style_id": item["style_id"],
+                            "source_snapshot_id": snapshot_id,
+                        },
+                    )
                 except Exception as exc:
                     st.error(f"试戴失败：{exc}")
                     return
@@ -210,7 +248,12 @@ def style_card(
             st.rerun()
 
 
-def render_recommendation_grid(snapshot: dict[str, Any] | None, session_id: str, prefix: str, styles_map: dict[str, dict[str, Any]]) -> None:
+def render_recommendation_grid(
+    snapshot: dict[str, Any] | None,
+    session_id: str,
+    prefix: str,
+    styles_map: dict[str, dict[str, Any]],
+) -> None:
     if not snapshot:
         st.info("暂无推荐结果")
         return
@@ -260,7 +303,10 @@ def render_profile(profile: dict[str, Any], user_image: dict[str, Any]) -> None:
 # ── Page ──────────────────────────────────────────────────────────────────────
 
 
-st.markdown('<div class="kicker">User-side Try-on Recommendation · V1 (API-backed)</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="kicker">User-side Try-on Recommendation · V1 (API-backed)</div>',
+    unsafe_allow_html=True,
+)
 st.title("美甲试戴推荐 Demo V1")
 st.markdown(
     '<div class="subtitle">上传手图生成本次会话画像，第一轮按参考手匹配，第二轮从点击与真实 ComfyUI 试戴中学习颜色偏好并推荐相似款。</div>',
@@ -384,7 +430,9 @@ with tab_tryon:
             if result_url:
                 st.image(result_url, caption=f"试戴结果：{style.get('title', '')}", width="stretch")
             else:
-                st.warning(f"试戴未完成：{try_on_job.get('status')} · {try_on_job.get('error_message') or ''}")
+                st.warning(
+                    f"试戴未完成：{try_on_job.get('status')} · {try_on_job.get('error_message') or ''}"
+                )
     else:
         st.info("还没有试戴结果，请在推荐卡片中点击「试戴」。")
 
@@ -396,14 +444,20 @@ with tab_tryon:
 
 with tab_round2:
     st.subheader("第二轮推荐：视觉偏好相似款")
-    st.caption("点击/试戴不会直接让原款置顶，而是学习色系、调色板、冷暖、明暗和饱和度后推荐相似款。")
+    st.caption(
+        "点击/试戴不会直接让原款置顶，而是学习色系、调色板、冷暖、明暗和饱和度后推荐相似款。"
+    )
     c1, _ = st.columns([1, 4])
     if c1.button("刷新推荐", width="stretch"):
         try:
             api_post(f"/sessions/{session_id}/recommendations/round2")
             st.success("已根据本次行为生成第二轮推荐")
         except requests.HTTPError as exc:
-            msg = exc.response.json().get("detail", str(exc)) if exc.response is not None else str(exc)
+            msg = (
+                exc.response.json().get("detail", str(exc))
+                if exc.response is not None
+                else str(exc)
+            )
             st.warning(msg)
         st.rerun()
     if not round2:

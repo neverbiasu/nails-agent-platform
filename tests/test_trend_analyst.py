@@ -1,7 +1,7 @@
 """Unit tests for trend_analyst worker (no API key required)."""
+
 from __future__ import annotations
 
-import pytest
 
 from nails_agent.agents.workers.trend_analyst import analyse
 from nails_agent.models.schemas import TrendSignal

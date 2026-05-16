@@ -1,8 +1,14 @@
 """Unit tests for value_evaluator worker (no API key required)."""
+
 from __future__ import annotations
 
 from nails_agent.agents.workers.value_evaluator import evaluate
-from nails_agent.models.schemas import StyleLibraryItem, StyleTrend, TrendAnalysisResult, TrendSignal
+from nails_agent.models.schemas import (
+    StyleLibraryItem,
+    StyleTrend,
+    TrendAnalysisResult,
+    TrendSignal,
+)
 
 _EMPTY_LIBRARY: list[StyleLibraryItem] = []
 

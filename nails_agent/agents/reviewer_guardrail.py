@@ -100,19 +100,25 @@ class ReviewerGuardrail:
 
         # Score gate
         if pkg.review_score < _SCORE_REJECT_THRESHOLD:
-            risk_flags.append(f"review_score {pkg.review_score:.2f} 低于拒绝阈值 {_SCORE_REJECT_THRESHOLD}")
+            risk_flags.append(
+                f"review_score {pkg.review_score:.2f} 低于拒绝阈值 {_SCORE_REJECT_THRESHOLD}"
+            )
 
         if risk_flags:
             return ReviewDecision(
                 status="reject",
                 reason=f"规则层拒绝：{'; '.join(risk_flags)}",
-                suggestions=["重新采集数据后再触发"] if pkg.review_score < _SCORE_REJECT_THRESHOLD else ["移除违规内容后重试"],
+                suggestions=["重新采集数据后再触发"]
+                if pkg.review_score < _SCORE_REJECT_THRESHOLD
+                else ["移除违规内容后重试"],
                 risk_flags=risk_flags,
             )
 
         # Soft check: revise if score is borderline
         if pkg.review_score < _SCORE_REVISE_THRESHOLD:
-            suggestions.append(f"review_score {pkg.review_score:.2f} 偏低，建议补充更多趋势信号后重试")
+            suggestions.append(
+                f"review_score {pkg.review_score:.2f} 偏低，建议补充更多趋势信号后重试"
+            )
             return ReviewDecision(
                 status="revise",
                 reason=f"内容质量待提升（score={pkg.review_score:.2f}，未达 pass 阈值 {_SCORE_REVISE_THRESHOLD}）",
@@ -159,6 +165,7 @@ class ReviewerGuardrail:
             messages=[{"role": "user", "content": prompt}],
         )
         import json
+
         raw = msg.content[0].text.strip()
         # Extract JSON even if surrounded by markdown fences
         if "```" in raw:

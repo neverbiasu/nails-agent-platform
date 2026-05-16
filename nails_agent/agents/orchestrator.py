@@ -258,6 +258,7 @@ class PipelineOrchestrator:
                 analysis = run_trend_scout(focus_keywords=keywords[:5], progress_cb=emit)
             else:
                 from nails_agent.agents.workers import trend_analyst as _ta
+
                 analysis = _ta.analyse(signals)
             state.trend_analysis = analysis
             self._persist_trend_analysis(state.pipeline_id, analysis)
@@ -267,8 +268,10 @@ class PipelineOrchestrator:
                 clusters=[
                     TrendCluster(
                         cluster_id=f"cluster_{i}",
-                        keywords=[s.keyword for s in analysis.top_10[i * 3: i * 3 + 3]],
-                        top_tags=analysis.top_10[i * 3].style_tags if analysis.top_10[i * 3:] else [],
+                        keywords=[s.keyword for s in analysis.top_10[i * 3 : i * 3 + 3]],
+                        top_tags=analysis.top_10[i * 3].style_tags
+                        if analysis.top_10[i * 3 :]
+                        else [],
                     )
                     for i in range(min(3, (len(analysis.top_10) + 2) // 3))
                 ],
@@ -309,9 +312,12 @@ class PipelineOrchestrator:
 
             strategy_event = StrategyEvent(
                 trigger_id=trigger_id,
-                strategy_summary=campaign.executive_summary or (campaign.style_cards[0].style_name if campaign.style_cards else "策略已生成"),
+                strategy_summary=campaign.executive_summary
+                or (campaign.style_cards[0].style_name if campaign.style_cards else "策略已生成"),
                 platform_variants=[c.model_dump() for c in campaign.style_cards[:3]],
-                publish_schedule=campaign.style_cards[0].schedule.model_dump() if campaign.style_cards and campaign.style_cards[0].schedule else None,
+                publish_schedule=campaign.style_cards[0].schedule.model_dump()
+                if campaign.style_cards and campaign.style_cards[0].schedule
+                else None,
             )
             self.event_log.write(
                 event_type="StrategyEvent",

@@ -1,7 +1,7 @@
 """Tests for EventLog write/read and CandidatePackage persistence (A1)."""
+
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -121,6 +121,7 @@ def test_update_candidate_review(event_log: EventLog) -> None:
 
     assert row["review_status"] == "pending_human"
     import json
+
     output = json.loads(row["review_output"])
     assert output["status"] == "pass"
     assert "内容质量达标" in output["reason"]

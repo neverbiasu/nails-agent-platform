@@ -67,8 +67,11 @@ def render():
             st.success(f"✅ 生成成功（{result['duration_s']}s）")
             img_url = result["image_url"]
             if img_url and (img_url.startswith("http") or Path(img_url).exists()):
-                st.image(img_url, caption=f"AI 试戴 — {st.session_state.tryon_style}",
-                         use_container_width=True)
+                st.image(
+                    img_url,
+                    caption=f"AI 试戴 — {st.session_state.tryon_style}",
+                    use_container_width=True,
+                )
             else:
                 st.image(str(nail_img), caption="预览效果", use_container_width=True)
         else:

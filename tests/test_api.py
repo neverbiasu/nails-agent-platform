@@ -1,4 +1,5 @@
 """FastAPI endpoint tests (no API key required, uses rule-based fallback)."""
+
 from __future__ import annotations
 
 import pytest

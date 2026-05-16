@@ -1,14 +1,14 @@
 import json
 from pathlib import Path
 
-DATA_DIR   = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent / "data"
 OUTPUT_DIR = Path(__file__).parent / "output"
 
 # Pipeline persistence wraps lists as {wrapper_key: [...], timestamp: ...}.
 # Mock seeds are flat lists. We unwrap on load so the UI sees one schema.
 _UNWRAP_KEYS = {
     "metric_snapshots.json": "snapshots",
-    "style_cards.json":      "style_cards",
+    "style_cards.json": "style_cards",
 }
 
 

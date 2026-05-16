@@ -7,24 +7,38 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_loader import load_trend_signals, load_metric_snapshots, load_style_library
 
-ALL_TAGS = ["猫眼", "法式", "3D立体", "渐变", "星月", "奶油", "镜面", "贴片", "冰透",
-            "浮雕", "彩绘", "大理石纹", "碎钻", "纯色"]
+ALL_TAGS = [
+    "猫眼",
+    "法式",
+    "3D立体",
+    "渐变",
+    "星月",
+    "奶油",
+    "镜面",
+    "贴片",
+    "冰透",
+    "浮雕",
+    "彩绘",
+    "大理石纹",
+    "碎钻",
+    "纯色",
+]
 PLATFORMS = ["全部", "小红书", "抖音", "Instagram"]
 
 # Per-style Unsplash photos (nail-specific)
 STYLE_IMAGES = {
-    "cat_eye":        "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
+    "cat_eye": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
     "ice_blue_cat_eye": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
-    "french":         "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
-    "gradient":       "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
-    "emboss":         "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
-    "marble":         "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
-    "celestial":      "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
-    "solid":          "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
-    "colorful":       "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
-    "mirror":         "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
-    "matte_cream":    "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
-    "rhinestone":     "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
+    "french": "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
+    "gradient": "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
+    "emboss": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
+    "marble": "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
+    "celestial": "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
+    "solid": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
+    "colorful": "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
+    "mirror": "https://images.unsplash.com/photo-1604655855783-7abfe0b53c87?w=300&q=80",
+    "matte_cream": "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=300&q=80",
+    "rhinestone": "https://images.unsplash.com/photo-1604655855782-c2e4fe62e461?w=300&q=80",
 }
 
 
@@ -88,7 +102,9 @@ def render():
     if platform_filter != "全部":
         filtered = [t for t in filtered if t["platform"] == platform_filter]
     if tag_filter:
-        filtered = [t for t in filtered if any(tag in t.get("style_tags", []) for tag in tag_filter)]
+        filtered = [
+            t for t in filtered if any(tag in t.get("style_tags", []) for tag in tag_filter)
+        ]
 
     filtered_sorted = sorted(filtered, key=lambda t: t["_score"], reverse=True)
     top10 = sorted(signals, key=lambda t: _composite(t), reverse=True)[:10]
@@ -98,15 +114,20 @@ def render():
     # ── Left: trend table ──────────────────────────────────────────────────────
     with col_left:
         st.subheader(f"趋势列表（{len(filtered_sorted)} 条）")
-        df = pd.DataFrame([{
-            "热度": t["_score"],
-            "平台": t["platform"],
-            "关键词": t["keyword"],
-            "点赞": t["likes"],
-            "收藏": t["collects"],
-            "分享": t["shares"],
-            "标签": "、".join(t.get("style_tags", [])[:3]),
-        } for t in filtered_sorted])
+        df = pd.DataFrame(
+            [
+                {
+                    "热度": t["_score"],
+                    "平台": t["platform"],
+                    "关键词": t["keyword"],
+                    "点赞": t["likes"],
+                    "收藏": t["collects"],
+                    "分享": t["shares"],
+                    "标签": "、".join(t.get("style_tags", [])[:3]),
+                }
+                for t in filtered_sorted
+            ]
+        )
 
         event = st.dataframe(
             df,
@@ -120,14 +141,16 @@ def render():
     # ── Right: charts + matched styles ─────────────────────────────────────────
     with col_right:
         st.subheader("Top 10 综合热度")
-        fig_bar = go.Figure(go.Bar(
-            x=[t["_score"] for t in top10],
-            y=[t["keyword"] for t in top10],
-            orientation="h",
-            marker_color="#FF6B9D",
-            text=[f"{t['_score']:.0f}" for t in top10],
-            textposition="outside",
-        ))
+        fig_bar = go.Figure(
+            go.Bar(
+                x=[t["_score"] for t in top10],
+                y=[t["keyword"] for t in top10],
+                orientation="h",
+                marker_color="#FF6B9D",
+                text=[f"{t['_score']:.0f}" for t in top10],
+                textposition="outside",
+            )
+        )
         fig_bar.update_layout(
             height=320,
             margin=dict(l=0, r=20, t=10, b=0),
@@ -154,14 +177,16 @@ def render():
                 snap["style_gap_score"],
                 snap["launch_priority_score"],
             ]
-            fig_radar = go.Figure(go.Scatterpolar(
-                r=values + [values[0]],
-                theta=categories + [categories[0]],
-                fill="toself",
-                fillcolor="rgba(255, 107, 157, 0.2)",
-                line_color="#FF6B9D",
-                name=selected_trend["keyword"],
-            ))
+            fig_radar = go.Figure(
+                go.Scatterpolar(
+                    r=values + [values[0]],
+                    theta=categories + [categories[0]],
+                    fill="toself",
+                    fillcolor="rgba(255, 107, 157, 0.2)",
+                    line_color="#FF6B9D",
+                    name=selected_trend["keyword"],
+                )
+            )
             fig_radar.update_layout(
                 polar=dict(radialaxis=dict(range=[0, 100])),
                 showlegend=False,
@@ -182,12 +207,11 @@ def render():
             # Show style cards 4 per row
             cols_per_row = 4
             for i in range(0, len(matched), cols_per_row):
-                row_styles = matched[i:i + cols_per_row]
+                row_styles = matched[i : i + cols_per_row]
                 cols = st.columns(cols_per_row)
                 for col, style in zip(cols, row_styles):
                     with col:
-                        img_url = STYLE_IMAGES.get(style["style_id"],
-                                                    style.get("image_url", ""))
+                        img_url = STYLE_IMAGES.get(style["style_id"], style.get("image_url", ""))
                         if img_url:
                             try:
                                 st.image(img_url, use_container_width=True)
