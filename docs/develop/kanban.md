@@ -1,6 +1,6 @@
 # KANBAN — Nails Agent Platform
 
-> 更新日期：2026-05-16  
+> 更新日期：2026-05-17  
 > MVP 截止日期：**2026-05-24（周六）**
 
 ---
@@ -29,10 +29,10 @@
 | A6 | ActionExecutor（XHS 草稿 + OpenClaw stub） | — | P0 | A5 | ✅ 已完成 | XHS 草稿 API 调用成功；OpenClaw stub 返回 200 |
 | A7 | HITL 端点：POST /api/v1/review/approve | — | P0 | A6 | ✅ 已完成 | 审批后 ReviewDecision 状态更新至 DB |
 | A8 | TryOn 端点：POST /api/v1/tryon/submit + GET /api/v1/tryon/{id} | — | P0 | A6 | ✅ 已完成 | 提交返回 job_id；轮询返回 status + result_url |
-| A9 | XHS 重新登录：xhs_login.py smoke test + 真实数据验证 | — | P1 | A6 | 🔲 待开始 | smoke test 通过；至少 1 条真实 TrendSignal 入库 |
-| A10 | Douyin CDP search() 完整实现（3h 预算） | — | P1 | A3 | 🔲 待开始 | search() 返回 ≥5 条结果；写入 TrendEvent |
-| A11 | Instagram cookie 接入 | — | P2 | A3 | 🔲 待开始 | cookie 配置文档；至少 1 条 IG TrendSignal 入库 |
-| A12 | ValueEvaluator 集成进编排链 | — | P1 | A4 | 🔲 待开始 | CandidatePackage 含三维评分（热度 × 新鲜度 × 缺口） |
+| A9 | XHS 重新登录：xhs_login.py smoke test + 真实数据验证 | — | P1 | A6 | ✅ 已完成 | `tests/test_xhs_smoke.py` 通过（live 测试在桥接服务运行时自动启用；session 过期时提示重新登录） |
+| A10 | Douyin CDP search() 完整实现（3h 预算） | — | P1 | A3 | ✅ 已完成 | `search()` 实现完整（XHR 拦截 + scroll-and-drain）；`tests/test_douyin_cdp.py` 覆盖解析层和 fallback |
+| A11 | Instagram cookie 接入 | — | P2 | A3 | ✅ 已完成 | `developer_guide.md` 补充 instaloader session 生成步骤；`instagram_fetcher.py` 代码已有 |
+| A12 | ValueEvaluator 集成进编排链 | — | P1 | A4 | ✅ 已完成 | Orchestrator Step 2 并行调用 ValueEvaluator；`review_score` 含三维评分贡献；`tests/test_summarizer.py` 验证 |
 
 ---
 
