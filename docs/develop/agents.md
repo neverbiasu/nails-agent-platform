@@ -53,8 +53,8 @@ PRD v4 定义 **9 个角色**，分三层：
 
 | Agent | 职责 | 实现文件 | 状态 |
 |-------|------|---------|------|
-| **Trigger Gateway** | 解析触发信号（关键词/Webhook/Cron），路由到目标 pipeline | `api/main.py` POST /chat, /pipeline/* | ✅ |
-| **Orchestrator** | 全局步骤编排；管理 `PipelineState`；驱动并行/串行执行 | `agents/orchestrator.py` + `nail_agents.py` `get_orchestrator_agent()` | ✅ |
+| **Trigger Gateway** | 标准化触发入口；写 TriggerEvent 到 event_log；调用 Orchestrator.run_pipeline() | `agents/trigger_gateway.py` + `api/main.py` POST /api/v1/trigger | ✅ |
+| **Orchestrator** | 全局步骤编排；管理 PipelineState + EventLog；驱动 run_pipeline() 完整链路 | `agents/orchestrator.py` | ✅ |
 
 ### 执行层（核心分析）
 
@@ -64,14 +64,14 @@ PRD v4 定义 **9 个角色**，分三层：
 | **Value Evaluator** | — (rule-based worker) | `workers/value_evaluator.py` | ✅ |
 | **Asset Generator** | — (rule-based worker) | `workers/asset_generator.py` | ✅ |
 | **Campaign Strategist** | 4（load_trend_context / check_xhs_compliance / save_campaign_card / finalise_campaign） | `nail_agents.py` `get_campaign_agent()` + `campaign_strategist.py` | ✅ |
-| **Summarizer** | — (rule-based worker) | `workers/summarizer.py` | ✅ |
+| **Summarizer** | 汇总 TrendAnalysisResult + CampaignStrategyResult → CandidatePackage；计算 review_score | `agents/summarizer.py` | ✅ |
 
 ### 控制 & 执行层
 
 | Agent | 职责 | 实现 | 状态 |
 |-------|------|------|------|
-| **Reviewer Guardrail** | 在任意步骤边界插入人机协作 Checkpoint；运营人员在 Chat UI 确认后放行（K5） | `agents/chat_runner.py` `make_checkpoint()` + 11 相状态机 | ✅ |
-| **Action Executor** | 将审核通过的运营计划发布到小红书/抖音/Instagram；记录发布状态（K4 闭环） | 设计中，计划对接 xhs-mcp / AiToEarn MCP | 🔲 |
+| **Reviewer Guardrail** | 规则+LLM 两层审查 CandidatePackage，输出 ReviewDecision（pass/revise/reject）；HITL Checkpoint（K5） | `agents/reviewer_guardrail.py` + `POST /api/v1/review/approve` | ✅ |
+| **Action Executor** | 将 HITL 确认后的 CandidatePackage 发布到 XHS（Go 草稿服务）或 OpenClaw webhook；写 ActionEvent | `agents/action_executor.py` + `POST /api/v1/action/publish` | ✅ |
 
 ---
 
@@ -351,31 +351,49 @@ def is_available() -> bool:
 
 ---
 
-## 9. Action Executor（设计规范）
+## 9. Action Executor
 
-> 🔲 未实现。以下为 PRD v4 设计规范，供后续实现参考。
+> ✅ 已实现：`nails_agent/agents/action_executor.py`
 
-**触发条件**：Reviewer Guardrail 在 `reporting` 阶段选择"确认发布"后，由 Orchestrator 调用。
+**触发条件**：商家在前端点击"确认执行" → `POST /api/v1/action/publish` → `ActionExecutor.publish(pkg, platform)`
 
-**计划实现**：
+**接口**：
 
 ```python
-# nail_tools.py 新增
-@function_tool
-def publish_to_xhs(style_card_json: str, scheduled_at: str) -> str:
-    """发布款式文案到小红书，返回发布任务 ID。"""
-    # 对接 xhs-mcp（MCP server :18060，xhs_create_draft + xhs_publish_draft）
-    ...
-
-@function_tool
-def publish_to_douyin(style_card_json: str) -> str:
-    """发布款式视频/图文到抖音。"""
-    ...
+class ActionExecutor:
+    def publish(self, pkg: CandidatePackage, platform: str) -> ActionEvent:
+        """platform: 'xhs' | 'openclaw'"""
 ```
 
-**写 SQLite**：新增 `publish_jobs` 表，记录发布状态（pending/success/failed）。
+**XHS 实现**（调用 Go 服务）：
 
-**注册到 Orchestrator**：在 `chat_runner.py` 的 `reporting → done` 路由中调用 Action Executor。
+```python
+# POST http://localhost:18060/api/v1/drafts/create
+payload = {
+    "title": pkg.trend_summary[:50],
+    "content": f"{pkg.trend_summary}\n\n{pkg.strategy}",
+    "images": pkg.assets[:9],  # XHS 最多 9 张图
+}
+```
+
+**OpenClaw 实现**（webhook stub）：
+
+```python
+# POST $OPENCLAW_WEBHOOK_URL
+payload = {
+    "trigger_id": pkg.trigger_id,
+    "message": f"【美甲趋势播报】{pkg.trend_summary[:100]}",
+    "strategy": pkg.strategy[:200],
+    "source": "nails-agent-platform",
+}
+```
+
+**降级策略**：
+- XHS Go 服务不可达 → `status="pending"`，写 ActionEvent 记录
+- OpenClaw URL 未配置 → `status="pending"`，写 ActionEvent 记录
+- 两者均不阻塞主链路
+
+**输出**：`ActionEvent(action_id, trigger_id, platform, status, result_url)` 写入 event_log
 
 ---
 
@@ -447,12 +465,188 @@ ReviewerGuardrail → ReviewDecision(status="pass")
 
 ---
 
+---
+
+## 11. TriggerGateway（MVP 新增）
+
+> `nails_agent/agents/trigger_gateway.py`
+
+**职责**：标准化 pipeline 触发入口。不做趋势分析，只负责验证入参、分配 trigger_id、写首条 EventLog。
+
+```python
+class TriggerGateway:
+    def fire(self, source: str, keywords: list[str], goal: str | None, shop_data: dict) -> TriggerEvent:
+        event = TriggerEvent(source=source, keywords=keywords, ...)
+        event_log.write(event_type="TriggerEvent", payload=event.model_dump(), trigger_id=event.trigger_id, agent_id="TriggerGateway")
+        return event
+```
+
+**输入（via POST /api/v1/trigger）**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| source | str | "manual" \| "scheduled" \| "signal" |
+| keywords | list[str] | 趋势关键词，可为空（用默认关键词） |
+| goal | str? | 目标描述，如"冲爆款" |
+| shop_data | dict | 店铺信息（可选，未来个性化用） |
+
+**输出**：`{ trigger_id: str, status: "queued" }`
+
+**不做什么**：不采集数据，不分析趋势。
+
+---
+
+## 12. Summarizer Agent（MVP 升级）
+
+> `nails_agent/agents/summarizer.py`
+
+**职责**：收集 Step 1–3 的结构化输出，格式化为 `CandidatePackage`，供 ReviewerGuardrail 审查。
+
+```python
+class Summarizer:
+    def summarise(self, trigger_id: str, state: PipelineState) -> CandidatePackage:
+```
+
+**review_score 计算逻辑**（启发式，范围 0–1）：
+
+| 维度 | 权重 | 计算方式 |
+|------|------|---------|
+| 信号数量 | 0.30 | min(0.3, len(top_10) / 30) |
+| 上线优先级 | 0.40 | min(0.4, top_priority_score / 100 × 0.4) |
+| 策略卡片数 | 0.30 | min(0.3, card_count / 10 × 0.3) |
+
+**写 EventLog**：
+1. `event_log.save_candidate(pkg)` — 写 `candidate_packages` 表
+2. `event_log.write("SummaryEvent", ...)` — 写 `event_log` 表
+
+---
+
+## 13. ReviewerGuardrail（MVP 新增）
+
+> `nails_agent/agents/reviewer_guardrail.py`
+
+**职责**：两层审查 CandidatePackage，输出 ReviewDecision。不执行任何动作。
+
+### Layer 1 — 规则层（必跑）
+
+| 条件 | 结果 |
+|------|------|
+| 文本包含黑名单词（违规/假货/刷单/博彩等） | reject |
+| review_score < 0.30 | reject |
+| review_score < 0.55 | revise |
+| 其余 | pass（带 suggestions） |
+
+**黑名单**（18 词）：违规、假货、非法、违法、欺诈、仿品、刷单、博彩、色情、赌博 等
+
+### Layer 2 — LLM 层（可选，需 API key）
+
+- 模型：`claude-haiku-4-5-20251001`（最快/最省 token）
+- 仅在 Layer 1 未 reject 时触发
+- 失败时静默 fallback 到 Layer 1 结论
+
+### 输出
+
+```python
+class ReviewDecision(BaseModel):
+    status: str        # "pass" | "revise" | "reject"
+    reason: str
+    suggestions: list[str]
+    risk_flags: list[str]
+```
+
+### 写 SQLite
+
+| 操作 | 说明 |
+|------|------|
+| `event_log.update_candidate_review(trigger_id, decision, status)` | 更新 candidate_packages.review_status |
+| pass → `review_status="pending_human"` | 等待 HITL 确认 |
+| reject → `review_status="rejected"` | 终止链路 |
+| `event_log.write("ReviewEvent", ...)` | 写 event_log 表 |
+
+---
+
+## 14. ActionExecutor（MVP 新增）
+
+见 [§9](#9-action-executor) 详细规范。
+
+**环境变量**：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `XHS_GO_BASE_URL` | `http://localhost:18060` | XHS Go 服务地址 |
+| `OPENCLAW_WEBHOOK_URL` | 空 | OpenClaw webhook；未设置则 stub |
+
+**调用链**：
+```
+POST /api/v1/action/publish
+  → ActionExecutor.publish(pkg, platform)
+    → _publish_xhs() 或 _publish_openclaw()
+      → _record() → ActionEvent → event_log
+```
+
+---
+
+## 15. EventLog（Memory 层核心）
+
+> `nails_agent/memory/event_log.py`
+
+**职责**：pipeline 事件的一等公民存储。所有 Agent 完成后立即调用，不等整条链路。
+
+### 核心方法
+
+```python
+class EventLog:
+    def write(self, event_type: str, payload: dict, trigger_id: str | None, agent_id: str | None) -> EventLogEntry
+    def list_by_trigger(self, trigger_id: str, limit: int = 50, offset: int = 0) -> list[EventLogEntry]
+    def list_recent(self, limit: int = 50) -> list[EventLogEntry]
+    def save_candidate(self, pkg: CandidatePackage) -> None
+    def get_candidate(self, trigger_id: str) -> CandidatePackage | None
+    def update_candidate_review(self, trigger_id: str, decision: ReviewDecision, status: str) -> None
+```
+
+### event_type 枚举
+
+| event_type | 写入方 | 触发时机 |
+|-----------|--------|---------|
+| TriggerEvent | TriggerGateway | POST /api/v1/trigger |
+| TrendEvent | Orchestrator | Step 1 完成后 |
+| StrategyEvent | Orchestrator | Step 3 完成后 |
+| SummaryEvent | Summarizer | Step 4 完成后 |
+| ReviewEvent | ReviewerGuardrail | 审查完成后 |
+| ActionEvent | ActionExecutor | 发布完成后 |
+| HumanApprovalEvent | API /review/approve | 商家点击确认 |
+| ErrorEvent | Orchestrator | 任意步骤异常 |
+| FeedbackEvent | 前端 API | 用户收藏/咨询 |
+
+### 完整链路示例
+
+```
+trigger_id=abc123 的 event_log 记录（按 created_at 排序）:
+
+TriggerEvent   agent=TriggerGateway    source=manual, keywords=[法式甲]
+TrendEvent     agent=TrendAnalyst      confidence=0.82, top_keywords=[法式甲, 猫眼]
+StrategyEvent  agent=CampaignStrategist  3张P0卡片
+SummaryEvent   agent=Summarizer        review_score=0.73
+ReviewEvent    agent=ReviewerGuardrail  status=pass, reason=规则层通过
+HumanApprovalEvent  agent=HumanOperator  decision=pass
+ActionEvent    agent=ActionExecutor    platform=xhs, status=success
+```
+
+---
+
 ## 关键参考文件
 
+- [`nails_agent/agents/trigger_gateway.py`](../../nails_agent/agents/trigger_gateway.py) — TriggerGateway：标准化触发入口
+- [`nails_agent/agents/summarizer.py`](../../nails_agent/agents/summarizer.py) — Summarizer：CandidatePackage 生成
+- [`nails_agent/agents/reviewer_guardrail.py`](../../nails_agent/agents/reviewer_guardrail.py) — ReviewerGuardrail：规则+LLM 两层审查
+- [`nails_agent/agents/action_executor.py`](../../nails_agent/agents/action_executor.py) — ActionExecutor：XHS+OpenClaw 发布
+- [`nails_agent/memory/event_log.py`](../../nails_agent/memory/event_log.py) — EventLog：pipeline 事件一等公民
 - [`nails_agent/agents/nail_agents.py`](../../nails_agent/agents/nail_agents.py) — Agent 定义（lru_cache 工厂）
 - [`nails_agent/agents/nail_tools.py`](../../nails_agent/agents/nail_tools.py) — 全部 @function_tool
 - [`nails_agent/agents/agent_config.py`](../../nails_agent/agents/agent_config.py) — 模型优先级配置
 - [`nails_agent/agents/chat_events.py`](../../nails_agent/agents/chat_events.py) — Phase / CheckpointPayload 定义
 - [`nails_agent/agents/chat_runner.py`](../../nails_agent/agents/chat_runner.py) — 11 相状态机实现
-- [`nails_agent/agents/orchestrator.py`](../../nails_agent/agents/orchestrator.py) — 4 步流水线 + _persist_*
+- [`nails_agent/agents/orchestrator.py`](../../nails_agent/agents/orchestrator.py) — 4 步流水线 + run_pipeline() + _persist_*
+- [`nails_agent/memory/store.py`](../../nails_agent/memory/store.py) — SQLite 读写封装（含 event_log / candidate_packages 表）
+- [`docs/develop/kanban.md`](kanban.md) — KANBAN：A/B/AB 任务跟踪
 - [`docs/scoring_formulas.md`](scoring_formulas.md) — 三维评分公式（Value Evaluator 数学基础）

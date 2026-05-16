@@ -4,6 +4,19 @@
 
 ---
 
+## 快速导航
+
+> 新贡献者入口——按需直达
+
+| 问题 | 去哪里 |
+|------|--------|
+| 我刚加入，从哪开始？ | [DEVELOPER_GUIDE.md](develop/developer_guide.md) |
+| 当前任务分工？ | [KANBAN.md](develop/kanban.md) |
+| API 在哪里？ | [API_REFERENCE.md](develop/api_reference.md) |
+| Agent 架构？ | [ARCHITECTURE.md](develop/architecture.md) + [AGENTS.md](develop/agents.md) |
+
+---
+
 ## 产品文档 `product/`
 
 > 面向产品经理、设计师、业务决策者
@@ -27,3 +40,4 @@
 | [DEVELOPER_GUIDE.md](develop/developer_guide.md) | 开发者手册：本地启动、扩展指南、测试、代码风格 |
 | [scoring_formulas.md](develop/scoring_formulas.md) | 价值评估三维评分公式（热度 × 新鲜度 × 缺口） |
 | [acceptance_plan.md](develop/acceptance_plan.md) | 集成验收 checklist（curl 命令 + UI 验证点） |
+| [KANBAN.md](develop/kanban.md) | 任务看板：A/B/AB 三轨道 KANBAN，MVP 进度跟踪，验收标准 |

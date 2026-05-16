@@ -56,17 +56,17 @@ PRD v4 定义 9 个 Agent 角色，分三层部署：
 
 | # | 角色 | 职责 | 实现状态 |
 |---|------|------|---------|
-| 1 | **Trigger Gateway** | 接收触发信号（关键词/Webhook/Cron），路由到对应 pipeline | ⚠️ 现以 FastAPI `/chat` + `/pipeline/run` 兜底；MVP 补齐：独立 `trigger_gateway.py`，写 `TriggerEvent` 到 event_log |
-| 2 | **Orchestrator** | 全局步骤编排，管理 PipelineState，驱动并行/串行执行 | ✅ `orchestrator.py` + `NailsOrchestrator` Agent；MVP 扩展 `run_pipeline(trigger: TriggerEvent)`，每步写 EventLog |
+| 1 | **Trigger Gateway** | 接收触发信号（关键词/Webhook/Cron），路由到对应 pipeline | ✅ 独立 `trigger_gateway.py`，写 TriggerEvent 到 event_log，调用 Orchestrator.run_pipeline() |
+| 2 | **Orchestrator** | 全局步骤编排，管理 PipelineState，驱动并行/串行执行 | ✅ `run_pipeline(TriggerEvent)` 全链路编排；每步写 EventLog |
 | 3 | **Trend Analyst** | 采集社媒信号，聚合趋势，输出 `TrendAnalysisResult` | ✅ `TrendScoutAgent` + `trend_analyst` worker |
 | 4 | **Value Evaluator** | 三维评分（热度/新鲜度/款式缺口），输出 `ValueEvaluationResult` | ⚠️ rule-based worker 已有，待接入 Orchestrator 编排链 |
 | 5 | **Asset Generator** | 生成款式卡草稿，输出 `AssetGenerationResult` | ⚠️ rule-based worker 已有，MVP stub（不阻塞主链路） |
 | 6 | **Campaign Strategist** | 生成三平台文案 + 定价排期，输出 `CampaignStrategyResult` | ✅ `CampaignAgent` + `campaign_strategist` worker |
-| 7 | **Summarizer** | 汇总 Worker 输出为 `CandidatePackage`，写 candidate_packages 表 | ⚠️ rule-based worker 已有；MVP 升级：输出 `CandidatePackage` 结构化 model |
-| 8 | **Reviewer Guardrail** | 规则 + LLM 两层审查，输出 `ReviewDecision`（pass/revise/reject），HITL | ⚠️ Chat UI `make_checkpoint()` 承担入口；MVP 补齐：`reviewer_guardrail.py` + `POST /api/v1/review/approve` |
-| 9 | **Action Executor** | 执行审核通过的动作（XHS 发草稿 + OpenClaw webhook），写 ActionEvent | 🔲 MVP 实现：XHS 草稿 + OpenClaw stub；详见 [agents.md §9](agents.md) |
+| 7 | **Summarizer** | 汇总 Worker 输出为 `CandidatePackage`，写 candidate_packages 表 | ✅ `agents/summarizer.py` 输出 CandidatePackage，写 SummaryEvent |
+| 8 | **Reviewer Guardrail** | 规则 + LLM 两层审查，输出 `ReviewDecision`（pass/revise/reject），HITL | ✅ `agents/reviewer_guardrail.py` 规则+LLM 两层，输出 ReviewDecision，HITL |
+| 9 | **Action Executor** | 执行审核通过的动作（XHS 发草稿 + OpenClaw webhook），写 ActionEvent | ✅ `agents/action_executor.py` XHS 草稿+OpenClaw stub；HITL 确认后执行 |
 
-> **注**：✅ = 已实现，⚠️ = 部分实现（MVP 需补齐），🔲 = 未实现。  
+> **注**：✅ = 已实现。全部 9 个角色均已 ✅ 实现（A0–A8，2026-05-16）。  
 > openai-agents SDK 完全能表达 PRD v4 Orchestrator-Worker 模式，不迁移 Hermes。
 
 ---
@@ -93,7 +93,8 @@ graph TD
         Orch -->|"use_agents=True"| CampAgent["🤖 CampaignAgent\nopenai-agents SDK"]
         Orch -->|"use_agents=False"| Workers["📐 Rule Workers\ntrend_analyst / value_evaluator\nasset_generator / campaign_strategist / summarizer"]
         Orch -->|"Checkpoint"| Guardrail["🔒 Reviewer Guardrail\nChat UI make_checkpoint()"]
-        Orch -.->|"设计中"| ActionExec["🚀 Action Executor\nxhs-mcp / AiToEarn MCP"]
+        Orch -->|"HITL confirm"| ActionExec["🚀 Action Executor\nagents/action_executor.py"]
+        Orch -->|"EventLog writes"| EventLog["📋 EventLog\nmemory/event_log.py\nevent_log + candidate_packages"]
 
         TrendAgent --> Tools["@function_tools\nsearch_xhs / search_douyin / search_instagram\nget_style_library / save_trend_analysis"]
         CampAgent --> CampTools["@function_tools\nload_trend_context / check_xhs_compliance\nsave_campaign_card / finalise_campaign"]
@@ -186,8 +187,12 @@ graph TD
                                                   ▼
                                       MemoryEntry(kind=insight) — 跨 run 长期记忆
                                                   │
-                                    [Action Executor 设计中]
-                                      发布到 XHS / Douyin / Instagram
+                                    ReviewDecision(status="pass")
+                                      ↓ candidate_packages(review_status="pending_human")
+                                      ↓ POST /api/v1/review/approve (HITL)
+                                    [Action Executor]
+                                      XHS 草稿发布 / OpenClaw webhook
+                                      → ActionEvent 写入 event_log
 ```
 
 Step 2a/2b 在 `ThreadPoolExecutor(max_workers=2)` 中并行运行；Step 1/3/4 串行；Reviewer Guardrail 可在任意步骤边界触发。
@@ -262,12 +267,16 @@ PRD v4 定义四层 Memory Fabric，当前已实现 L0–L3：
 | `recommendation_snapshots` | 推荐结果快照（Round 1/2） | RecommendationService |
 | `behavior_events` | 用户点击/试戴行为（K1 双链路入口） | InteractionService |
 | `tryon_jobs` | ComfyUI 任务跟踪 | InteractionService |
+| `event_log` | pipeline 事件链（TriggerEvent/TrendEvent/StrategyEvent/ReviewEvent/ActionEvent） | TriggerGateway, Orchestrator, Summarizer, ReviewerGuardrail, ActionExecutor |
+| `candidate_packages` | CandidatePackage（review_status: pending_review→pending_human→approved/rejected） | Summarizer, ReviewerGuardrail, ActionExecutor |
 
 **`distill()` 机制（K2 Strategy Loop）**：每次 pipeline 完成后，`memory.distill(pipeline_id)` 遍历所有 `pattern` 条目，合并去重为 `insight` 条目，形成跨 run 长期趋势记忆。下次 TrendScoutAgent 调用 `load_trend_context()` 时优先读取这些 insight。
 
 ---
 
 ## 6a. MVP 架构补齐目标（2026-05-24）
+
+> ✅ 已于 2026-05-16 全部完成（A0–A8）。以下为实现参考记录。
 
 ### 新增 SQLite 表
 
@@ -369,9 +378,15 @@ http://localhost:8080/api/    → FastAPI (prefix stripped)
 - [`nails_agent/memory/store.py`](../../nails_agent/memory/store.py) — SQLite 读写封装
 - [`nails_agent/agents/nail_agents.py`](../../nails_agent/agents/nail_agents.py) — Agent 定义（openai-agents SDK）
 - [`nails_agent/agents/chat_runner.py`](../../nails_agent/agents/chat_runner.py) — Chat UI 11 相状态机
+- [`nails_agent/agents/trigger_gateway.py`](../../nails_agent/agents/trigger_gateway.py) — TriggerGateway：标准化触发入口
+- [`nails_agent/agents/summarizer.py`](../../nails_agent/agents/summarizer.py) — Summarizer：CandidatePackage 生成
+- [`nails_agent/agents/reviewer_guardrail.py`](../../nails_agent/agents/reviewer_guardrail.py) — ReviewerGuardrail：规则+LLM 两层审查
+- [`nails_agent/agents/action_executor.py`](../../nails_agent/agents/action_executor.py) — ActionExecutor：XHS+OpenClaw 发布
+- [`nails_agent/memory/event_log.py`](../../nails_agent/memory/event_log.py) — EventLog：pipeline 事件一等公民
 - [`scripts/dev.sh`](../../scripts/dev.sh) — 本地启动脚本
 - [`Caddyfile`](../../Caddyfile) — 反向代理配置
 - [agents.md](agents.md) — Agent 层深度参考（9 角色完整手册）
 - [api_reference.md](api_reference.md) — REST 接口文档
 - [developer_guide.md](developer_guide.md) — 本地开发与扩展指南
 - [scoring_formulas.md](scoring_formulas.md) — 价值评估评分公式（K 维三维模型）
+- [docs/develop/kanban.md](kanban.md) — KANBAN：A/B/AB 任务跟踪
