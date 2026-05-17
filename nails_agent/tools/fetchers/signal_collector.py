@@ -191,7 +191,21 @@ class SignalCollector:
         if use_xhs:
             xhs = self._get_xhs_mcp()
             if xhs.is_available():
-                tasks["xhs"] = lambda: xhs.search(xhs_kws, limit_per_kw=limit_per_kw)
+
+                def _collect_xhs() -> List[TrendSignal]:
+                    results = xhs.search(xhs_kws, limit_per_kw=limit_per_kw)
+                    # Also pull homepage trending feed as fallback when search returns nothing
+                    if not results:
+                        trending = xhs.fetch_trending(limit=20)
+                        if trending:
+                            logger.info(
+                                "XHS-MCP: search returned 0, supplementing with %d trending",
+                                len(trending),
+                            )
+                        results = trending
+                    return results
+
+                tasks["xhs"] = _collect_xhs
             else:
                 logger.debug("XHS-MCP: Go server not running or not logged in")
 

@@ -161,6 +161,32 @@ async function handle(req, res) {
     }
   }
 
+  // Create draft — insert directly into xhs-mcp DB (no Gemini key needed for text-only drafts)
+  if (path === '/api/v1/drafts/create' && req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    let params;
+    try { params = JSON.parse(body); } catch { return json(res, 400, { success: false, message: 'invalid JSON' }); }
+    try {
+      const { randomUUID } = await import('crypto');
+      const draftId = randomUUID();
+      const now = new Date().toISOString();
+      const title = (params.title || '').slice(0, 100);
+      const content = params.content || '';
+      const tags = JSON.stringify(params.tags || []);
+      console.error('[xhs-bridge] create_draft (direct DB):', JSON.stringify({ draftId, title }));
+      db.run(
+        `INSERT INTO note_drafts (id, title, content, tags, images, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [draftId, title, content, tags, '[]', now, now]
+      );
+      return json(res, 200, { success: true, data: { draft_id: draftId, draft_url: `xhs://draft/${draftId}` } });
+    } catch (err) {
+      console.error('[xhs-bridge] create_draft error:', err.message);
+      return json(res, 500, { success: false, message: err.message });
+    }
+  }
+
   return json(res, 404, { success: false, message: 'not found' });
 }
 
