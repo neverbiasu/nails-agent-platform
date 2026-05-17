@@ -1,6 +1,7 @@
 """FastAPI endpoint tests (no API key required, uses rule-based fallback)."""
 
 from __future__ import annotations
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -53,11 +54,16 @@ async def test_memory_search_endpoint():
 
 @pytest.mark.asyncio
 async def test_trigger_pipeline_endpoint():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.post(
-            "/api/v1/trigger",
-            json={"source": "manual", "keywords": ["法式甲", "猫眼"], "goal": "冲爆款"},
-        )
+    # Patch run_pipeline so BackgroundTask doesn't hit real data sources in tests
+    with patch(
+        "nails_agent.api.main.get_orchestrator",
+        return_value=type("_Orc", (), {"run_pipeline": AsyncMock()})(),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.post(
+                "/api/v1/trigger",
+                json={"source": "manual", "keywords": ["法式甲", "猫眼"], "goal": "冲爆款"},
+            )
     assert resp.status_code == 200
     data = resp.json()
     assert "trigger_id" in data
@@ -67,16 +73,20 @@ async def test_trigger_pipeline_endpoint():
 
 @pytest.mark.asyncio
 async def test_events_endpoint_returns_trigger_event():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # Fire a trigger first
-        trigger_resp = await client.post(
-            "/api/v1/trigger",
-            json={"source": "test", "keywords": ["渐变色"]},
-        )
-        trigger_id = trigger_resp.json()["trigger_id"]
+    with patch(
+        "nails_agent.api.main.get_orchestrator",
+        return_value=type("_Orc", (), {"run_pipeline": AsyncMock()})(),
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Fire a trigger first
+            trigger_resp = await client.post(
+                "/api/v1/trigger",
+                json={"source": "test", "keywords": ["渐变色"]},
+            )
+            trigger_id = trigger_resp.json()["trigger_id"]
 
-        # Poll events for that trigger
-        events_resp = await client.get("/api/v1/events", params={"trigger_id": trigger_id})
+            # Poll events for that trigger
+            events_resp = await client.get("/api/v1/events", params={"trigger_id": trigger_id})
 
     assert events_resp.status_code == 200
     body = events_resp.json()

@@ -304,9 +304,14 @@ class InstagramFetcher:
             compress_json=False,
             quiet=True,
         )
+        session_path = self._resolve_session_file()
+        if not session_path:
+            logger.warning("Instagram instaloader: no session file found")
+            return []
         try:
-            username = os.path.basename(self.session_file).replace(".session", "")
-            L.load_session_from_file(username, self.session_file)
+            basename = os.path.basename(session_path)
+            username = basename[len("session-"):] if basename.startswith("session-") else basename.replace(".session", "")
+            L.load_session_from_file(username, session_path)
         except Exception as e:
             logger.warning("Instagram instaloader session error: %s", e)
             return []

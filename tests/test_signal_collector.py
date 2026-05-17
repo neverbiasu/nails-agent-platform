@@ -22,5 +22,12 @@ def test_signal_collector_source_status():
 
 def test_signal_collector_empty_keywords():
     collector = SignalCollector(mock_data_path="web/data/trend_signals.json")
-    signals = collector.collect(keywords=[], limit_per_kw=10)
+    signals = collector.collect(
+        keywords=[],
+        limit_per_kw=10,
+        use_xhs=False,
+        use_douyin=False,
+        use_instagram=False,
+        use_tikhub=False,
+    )
     assert isinstance(signals, list)
