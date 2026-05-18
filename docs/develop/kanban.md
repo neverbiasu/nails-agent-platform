@@ -31,7 +31,7 @@
 | A8 | TryOn 端点：POST /api/v1/tryon/submit + GET /api/v1/tryon/{id} | — | P0 | A6 | ✅ 已完成 | 提交返回 job_id；轮询返回 status + result_url |
 | A9 | XHS 重新登录：xhs_login.py smoke test + 真实数据验证 | — | P1 | A6 | ✅ 已完成 | `tests/test_xhs_smoke.py` 通过（live 测试在桥接服务运行时自动启用；session 过期时提示重新登录） |
 | A10 | Douyin CDP search() 完整实现（3h 预算） | — | P1 | A3 | ✅ 已完成 | `search()` 实现完整（XHR 拦截 + scroll-and-drain）；`tests/test_douyin_cdp.py` 覆盖解析层和 fallback |
-| A11 | Instagram cookie 接入 | — | P2 | A3 | ✅ 已完成 | `_resolve_session_file()` 自动发现 session；`scripts/ig_login.py` 生成 session；`developer_guide.md` 补充步骤 |
+| A11 | Instagram cookie 接入 | — | P2 | A3 | ✅ 已完成 | `developer_guide.md` 补充 instaloader session 生成步骤；`instagram_fetcher.py` 代码已有 |
 | A12 | ValueEvaluator 集成进编排链 | — | P1 | A4 | ✅ 已完成 | Orchestrator Step 2 并行调用 ValueEvaluator；`review_score` 含三维评分贡献；`tests/test_summarizer.py` 验证 |
 
 ---
