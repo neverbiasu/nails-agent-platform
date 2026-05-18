@@ -1,6 +1,6 @@
 # KANBAN — Nails Agent Platform
 
-> 更新日期：2026-05-17  
+> 更新日期：2026-05-18  
 > MVP 截止日期：**2026-05-24（周六）**
 
 ---
@@ -33,6 +33,14 @@
 | A10 | Douyin CDP search() 完整实现（3h 预算） | — | P1 | A3 | ✅ 已完成 | `search()` 实现完整（XHR 拦截 + scroll-and-drain）；`tests/test_douyin_cdp.py` 覆盖解析层和 fallback |
 | A11 | Instagram cookie 接入 | — | P2 | A3 | ✅ 已完成 | `developer_guide.md` 补充 instaloader session 生成步骤；`instagram_fetcher.py` 代码已有 |
 | A12 | ValueEvaluator 集成进编排链 | — | P1 | A4 | ✅ 已完成 | Orchestrator Step 2 并行调用 ValueEvaluator；`review_score` 含三维评分贡献；`tests/test_summarizer.py` 验证 |
+| A13 | **LLM 接入**：Summarizer/CampaignStrategist 真实 LLM 调用（非规则模板） | — | P0 | A4 | 🔲 待开始 | 设置 `ANTHROPIC_API_KEY`；至少 1 个 Worker 产出 LLM 生成文案；非 mock 字符串 |
+| A14 | TikHub 接入验证：`TIKHUB_API_KEY` 已在 `.env`，确认 IG/Douyin 信号回来 | — | P1 | — | 🔲 待开始 | SignalCollector 返回 `platform=TikTok` 或 `platform=Instagram` 真实信号 |
+
+> **⚠️ 交接说明（2026-05-18）：**
+> A0–A12 的后端基础架构已全部完成，56 个测试通过，pipeline 8 步 EventLog 链路可跑通。
+> **但整条 pipeline 目前全部是规则/模板逻辑，没有任何真实 LLM 调用**（TrendAnalyst、ValueEvaluator、Summarizer、CampaignStrategist 均为纯计算/模板）。
+> ReviewerGuardrail 有 LLM 路径但需要 `ANTHROPIC_API_KEY`，目前未设置。
+> MVP demo 要有 AI 感必须完成 A13。TikHub key 已有，A14 可直接测试。
 
 ---
 
@@ -86,9 +94,10 @@
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
-| XHS/Douyin 登录态过期或账号风控 | A9/A10 阻塞，B 端无真实数据 | 提前准备备用账号；A9 设 smoke test 尽早发现 |
-| Instagram cookie 需手动获取且频繁失效 | A11 工期不可控 | A11 列为 P2，MVP 可不包含 IG 数据 |
+| **无真实 LLM 调用（最高优先级）** | Demo 全是规则模板，无 AI 感 | 最优先完成 A13，设置 `ANTHROPIC_API_KEY` |
+| XHS session 过期 | 信号采集回落到 mock | `uv run python scripts/xhs_login.py --name nails` 重新登录 |
+| Douyin CDP 需手动启动 Chrome | A10 功能有但不自动运行 | `bash scripts/douyin_login.sh`，登录后留着 Chrome |
+| Instagram 需 instaloader session | A11 功能有但需初始化 | `uv run python scripts/ig_login.py --username <user>`，设 `INSTAGRAM_USERNAME` |
 | ComfyUI 渲染服务不稳定 / 超时 | A8 result_url 无法返回 | 准备 mock result_url 作为 fallback，保证 C 端 UI 可演示 |
 | AB0 合约冻结晚于 5-19 | B1 类型不同步，前后端 PR 冲突 | 提前在 PR 草稿中对齐关键 Schema，AB0 前不 merge Breaking 变更 |
 | B 端前端工期（B0–B4）压缩至 5 天内 | Demo 时前端不完整 | B8（导航）降为 P1；优先完成 B0→B4 主链路 |
-| ValueEvaluator（A12）接入可能影响 Orchestrator 稳定性 | 影响 A3/A5 已有功能 | A12 在独立分支开发，合并前跑回归测试 |
