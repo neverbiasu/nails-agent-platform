@@ -44,6 +44,8 @@ _API_PATTERNS = [
 
 
 def _parse_aweme(item: Dict[str, Any], keyword: str) -> Optional[TrendSignal]:
+    if not isinstance(item, dict):
+        return None
     info = item.get("aweme_info") or item
     if not isinstance(info, dict):
         return None

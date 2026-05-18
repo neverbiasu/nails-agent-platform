@@ -23,8 +23,10 @@ Consumer try-on (V1):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -60,9 +62,17 @@ app = FastAPI(
     version="0.2.0",
 )
 
+_CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "NAILS_CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8501,http://localhost:8503",
+    ).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -116,7 +126,7 @@ def get_event_log() -> EventLog:
 def get_trigger_gateway() -> TriggerGateway:
     global _trigger_gateway
     if _trigger_gateway is None:
-        _trigger_gateway = TriggerGateway()
+        _trigger_gateway = TriggerGateway(event_log=get_event_log())
     return _trigger_gateway
 
 
@@ -252,14 +262,53 @@ async def action_publish(req: ActionPublishRequest):
         raise HTTPException(status_code=404, detail="CandidatePackage not found for trigger_id")
 
     executor = get_action_executor()
-    action_event = executor.publish(pkg, platform=req.platform)
+    # Run sync httpx calls in a thread to avoid blocking the async event loop
+    action_event = await asyncio.to_thread(executor.publish, pkg, req.platform)
     return {"action_id": action_event.action_id, "status": action_event.status}
 
 
 # ── Try-on (flat API for Next.js) ─────────────────────────────────────────────
 # Simpler than the session-scoped consumer flow — accepts base64 image + style_id
 
+_TRYON_JOB_TTL = int(os.environ.get("NAILS_TRYON_JOB_TTL", 7200))  # seconds (default 2h)
+
+# In-memory write-through cache: {job_id: {status, result_url, _ts, ...}}
+# Backed by SQLite via EventLog so jobs survive restarts and are bounded in memory.
 _tryon_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+def _evict_stale_tryon_jobs() -> None:
+    """Remove in-memory entries older than TTL (SQLite copy is retained)."""
+    cutoff = time.time() - _TRYON_JOB_TTL
+    stale = [jid for jid, j in _tryon_jobs.items() if j.get("_ts", 0) < cutoff]
+    for jid in stale:
+        del _tryon_jobs[jid]
+
+
+def _persist_tryon_job(job_id: str, data: dict) -> None:
+    """Write job state to in-memory cache and EventLog (SQLite)."""
+    data.setdefault("_ts", time.time())
+    _tryon_jobs[job_id] = data
+    get_event_log().write(
+        event_type="TryOnJobEvent",
+        payload={k: v for k, v in data.items() if not k.startswith("_")},
+        trigger_id=job_id,
+        agent_id="TryOnWorker",
+    )
+
+
+def _load_tryon_job(job_id: str) -> Optional[Dict[str, Any]]:
+    """Cache-first read; falls back to EventLog on cache miss (e.g. after restart)."""
+    if job_id in _tryon_jobs:
+        return _tryon_jobs[job_id]
+    events = get_event_log().list_by_trigger(trigger_id=job_id)
+    for evt in reversed(events):
+        if evt.event_type == "TryOnJobEvent":
+            data = dict(evt.payload)
+            data["_ts"] = time.time()  # refresh cache TTL
+            _tryon_jobs[job_id] = data
+            return data
+    return None
 
 
 class TryOnSubmitRequest(BaseModel):
@@ -272,9 +321,10 @@ def _run_tryon_job(job_id: str, image_b64: str, style_id: str) -> None:
     import base64
     import tempfile
 
-    _tryon_jobs[job_id]["status"] = "running"
+    _persist_tryon_job(job_id, {"status": "running", "result_url": None, "style_id": style_id})
+    hand_path: Optional[str] = None
     try:
-        # Decode hand image
+        # Decode hand image to a temp file; always cleaned up in finally
         img_bytes = base64.b64decode(image_b64)
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             f.write(img_bytes)
@@ -300,21 +350,31 @@ def _run_tryon_job(job_id: str, image_b64: str, style_id: str) -> None:
             style_image_path=style_path,
         )
         if result.get("success"):
-            _tryon_jobs[job_id]["status"] = "done"
-            _tryon_jobs[job_id]["result_url"] = result.get("image_url", "")
+            _persist_tryon_job(
+                job_id,
+                {"status": "done", "result_url": result.get("image_url", ""), "style_id": style_id},
+            )
         else:
-            _tryon_jobs[job_id]["status"] = "failed"
-            _tryon_jobs[job_id]["error"] = result.get("error", "unknown")
+            _persist_tryon_job(
+                job_id,
+                {"status": "failed", "error": result.get("error", "unknown"), "style_id": style_id},
+            )
     except Exception as exc:
-        _tryon_jobs[job_id]["status"] = "failed"
-        _tryon_jobs[job_id]["error"] = str(exc)
+        _persist_tryon_job(job_id, {"status": "failed", "error": str(exc), "style_id": style_id})
+    finally:
+        if hand_path:
+            try:
+                os.unlink(hand_path)
+            except OSError:
+                pass
 
 
 @app.post("/api/v1/tryon/submit")
 async def tryon_submit(req: TryOnSubmitRequest, background_tasks: BackgroundTasks):
     """Submit a try-on job. Returns job_id immediately; renders in background."""
+    _evict_stale_tryon_jobs()
     job_id = str(_uuid.uuid4())
-    _tryon_jobs[job_id] = {"status": "pending", "result_url": None}
+    _persist_tryon_job(job_id, {"status": "pending", "result_url": None, "style_id": req.style_id})
     background_tasks.add_task(_run_tryon_job, job_id, req.image_base64, req.style_id)
     return {"job_id": job_id}
 
@@ -322,10 +382,10 @@ async def tryon_submit(req: TryOnSubmitRequest, background_tasks: BackgroundTask
 @app.get("/api/v1/tryon/{job_id}")
 async def tryon_status(job_id: str):
     """Poll try-on job status. status: pending|running|done|failed."""
-    job = _tryon_jobs.get(job_id)
+    job = _load_tryon_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Try-on job not found")
-    return job
+    return {k: v for k, v in job.items() if not k.startswith("_")}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

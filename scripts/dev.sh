@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Local dev launcher: FastAPI + Chat UI + Consumer + Caddy
+# Local dev launcher: XHS bridge + FastAPI + Chat UI + Consumer + Caddy
 # Logs → logs/<svc>.log   Ctrl-C stops everything.
 #
 # Via Caddy (:8080):
@@ -9,9 +9,19 @@
 #   /api/      → FastAPI  (nails_agent       :8000)
 #
 # Direct:
+#   :18060 XHS REST bridge  (scripts/xhs_rest_bridge.mjs)
+#   :8000  FastAPI
 #   :8501  Chat UI
 #   :8503  C端试戴
-#   :8000  FastAPI
+#
+# XHS bridge endpoints (used by xhs_mcp_fetcher.py):
+#   GET  /health
+#   GET  /api/v1/login/status
+#   GET  /api/v1/feeds/search?keyword=<kw>[&count=<n>]
+#   GET  /api/v1/feeds/list[?count=<n>]
+#
+#   If session is expired, re-login first:
+#     uv run python scripts/xhs_login.py --name nails
 #
 # MVP B端 endpoints:
 #   POST /api/v1/trigger          触发 pipeline
@@ -24,7 +34,7 @@
 #   POST /api/v1/tryon/submit     提交试戴任务
 #   GET  /api/v1/tryon/{job_id}   轮询试戴结果
 
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -58,7 +68,7 @@ if c.fetchone()[0] == 0:
     raise SystemExit(1)
 " 2>/dev/null; then
   echo "→ seeding SQLite style library…"
-  python -m nails_agent.services.seed_loader
+  python -m nails_agent.services.seed_loader || true
 fi
 
 # ── Cleanup on exit ──────────────────────────────────────────────────────────
@@ -72,6 +82,39 @@ cleanup() {
   wait 2>/dev/null || true
 }
 trap cleanup INT TERM EXIT
+
+# ── XHS REST bridge ──────────────────────────────────────────────────────────
+# Node.js v23 (ABI 131) matches the better-sqlite3 native binary in xhs-mcp.
+# Bun requires ABI 137 and cannot load the same binary, so we must use node.
+XHS_BRIDGE_NODE="${XHS_BRIDGE_NODE:-}"
+if [ -z "$XHS_BRIDGE_NODE" ]; then
+  # Prefer the NVM node version that matches xhs-mcp's better-sqlite3 ABI 131
+  for _v in v23.1.0 v23 v22.21.1 v22.22.2; do
+    _candidate="$HOME/.nvm/versions/node/$_v/bin/node"
+    if [ -x "$_candidate" ]; then
+      XHS_BRIDGE_NODE="$_candidate"
+      break
+    fi
+  done
+  [ -z "$XHS_BRIDGE_NODE" ] && XHS_BRIDGE_NODE="$(command -v node 2>/dev/null || true)"
+fi
+
+if [ -n "$XHS_BRIDGE_NODE" ]; then
+  echo "→ starting XHS REST bridge on :18060 (logs/xhs_bridge.log)"
+  "$XHS_BRIDGE_NODE" "$ROOT/scripts/xhs_rest_bridge.mjs" --port 18060 \
+    >logs/xhs_bridge.log 2>&1 &
+  pids+=($!)
+  # Wait until bridge is ready (max 10s)
+  for i in $(seq 1 10); do
+    if curl -sf http://localhost:18060/health >/dev/null 2>&1; then
+      echo "   XHS bridge ready (${i}s)"
+      break
+    fi
+    sleep 1
+  done
+else
+  echo "  (Node.js not found — XHS bridge skipped, will use mock data)"
+fi
 
 # ── FastAPI ──────────────────────────────────────────────────────────────────
 echo "→ starting FastAPI on :8000 (logs/api.log)"
@@ -113,6 +156,7 @@ if command -v caddy >/dev/null 2>&1; then
   echo "  API health:        http://localhost:8080/api/health"
   echo "  Trigger pipeline:  POST http://localhost:8080/api/v1/trigger"
   echo "  EventLog:          GET  http://localhost:8080/api/v1/events?trigger_id=..."
+  echo "  XHS bridge:        http://localhost:18060/health"
 else
   echo "  (Caddy not found — direct access:)"
   echo "  Chat UI:           http://localhost:8501/"
@@ -120,6 +164,7 @@ else
   echo "  API health:        http://localhost:8000/health"
   echo "  Trigger pipeline:  POST http://localhost:8000/api/v1/trigger"
   echo "  EventLog:          GET  http://localhost:8000/api/v1/events?trigger_id=..."
+  echo "  XHS bridge:        http://localhost:18060/health"
 fi
 echo
 echo "Press Ctrl-C to stop everything."

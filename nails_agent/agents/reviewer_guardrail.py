@@ -50,9 +50,11 @@ _SCORE_REVISE_THRESHOLD = 0.55
 class ReviewerGuardrail:
     def __init__(self, event_log: Optional[EventLog] = None, db_path: Optional[Path] = None):
         self.event_log = event_log or EventLog(db_path=db_path)
-        self._has_llm = bool(
-            os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
-        )
+        # Only use the LLM layer when an Anthropic key is present — the layer
+        # calls anthropic.Anthropic() directly. OpenRouter is NOT routed here;
+        # if only OPENROUTER_API_KEY is set the LLM layer is skipped and the
+        # rule-based decision is returned as-is.
+        self._has_llm = bool(os.environ.get("ANTHROPIC_API_KEY"))
 
     def review(self, pkg: CandidatePackage) -> ReviewDecision:
         """Run two-layer review and write ReviewEvent to EventLog."""
@@ -167,9 +169,12 @@ class ReviewerGuardrail:
         import json
 
         raw = msg.content[0].text.strip()
-        # Extract JSON even if surrounded by markdown fences
-        if "```" in raw:
-            raw = raw.split("```")[1].lstrip("json").strip()
+        # Strip markdown fences (```json ... ``` or ``` ... ```)
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]  # content between first pair of fences
+            if raw.startswith("json"):
+                raw = raw[4:]  # remove literal "json" prefix
+            raw = raw.strip()
         data = json.loads(raw)
         return ReviewDecision(
             status=data.get("status", preliminary.status),

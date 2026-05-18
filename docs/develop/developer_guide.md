@@ -97,6 +97,42 @@ open -a "Google Chrome" --args --remote-debugging-port=9222
 # 然后在该 Chrome 中手动登录 douyin.com 和 instagram.com
 ```
 
+**A11 — Instagram cookie 接入（可选，P2）**
+
+Instagram fetcher 使用 `instaloader` 的 session 文件（Cookie-based，不依赖 CDP）：
+
+```bash
+# 1. 安装 instaloader（已包含在 [dev] extras）
+pip install instaloader
+
+# 2. 登录并保存 session（交互式，需要 Instagram 账号）
+python - <<'EOF'
+import instaloader
+L = instaloader.Instaloader()
+L.interactive_login("your_ig_username")          # 输入密码 + 双因子验证码
+L.save_session_to_file()                         # 默认保存到 ~/.ig_session_<username>
+import shutil, pathlib
+shutil.copy(
+    next(pathlib.Path.home().glob(".ig_session_*")),
+    pathlib.Path.home() / ".ig_session.json",
+)
+print("Session saved → ~/.ig_session.json")
+EOF
+
+# 3. 验证：运行 smoke test（跳过若文件不存在）
+python -c "
+from nails_agent.tools.fetchers.instagram_fetcher import InstagramFetcher
+f = InstagramFetcher()
+print('available:', f.is_available())
+"
+```
+
+**注意事项：**
+- `~/.ig_session.json` 只需生成一次，Cookie 有效期约 90 天。
+- 过期后重新执行上面的第 2 步。
+- CI/CD 环境中 Instagram 数据源会自动 fallback 到 mock，不影响测试。
+- `SignalCollector` 在所有真实数据源均不可用时才使用 mock fallback。
+
 ---
 
 ## 4. 环境变量速查
