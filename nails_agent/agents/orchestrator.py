@@ -183,7 +183,8 @@ class PipelineOrchestrator:
             if persist_enabled:
                 self._persist_campaign(state.pipeline_id, campaign)
                 ingestion = ingest_campaign_styles(
-                    analysis, campaign,
+                    analysis,
+                    campaign,
                     memory=self.memory,
                     data_dir=str(self.data_dir),
                 )
@@ -375,7 +376,8 @@ class PipelineOrchestrator:
             if persist_enabled:
                 self._persist_campaign(state.pipeline_id, campaign)
                 ingestion = ingest_campaign_styles(
-                    analysis, campaign,
+                    analysis,
+                    campaign,
                     memory=self.memory,
                     data_dir=str(self.data_dir),
                 )
