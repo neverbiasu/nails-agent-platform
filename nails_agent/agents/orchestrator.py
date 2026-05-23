@@ -76,7 +76,9 @@ class PipelineOrchestrator:
         import os as _os
 
         self.use_agents = use_agents and bool(
-            _os.environ.get("ANTHROPIC_API_KEY") or _os.environ.get("OPENROUTER_API_KEY")
+            _os.environ.get("ANTHROPIC_API_KEY")
+            or _os.environ.get("OPENROUTER_API_KEY")
+            or _os.environ.get("MODELSCOPE_API_KEY")
         )
         # SignalCollector: uses TikHub + XHS Skills + mock fallback
         self.collector = collector or SignalCollector(
@@ -180,7 +182,11 @@ class PipelineOrchestrator:
             state.campaign_strategy = campaign
             if persist_enabled:
                 self._persist_campaign(state.pipeline_id, campaign)
-                ingestion = ingest_campaign_styles(analysis, campaign, memory=self.memory)
+                ingestion = ingest_campaign_styles(
+                    analysis, campaign,
+                    memory=self.memory,
+                    data_dir=str(self.data_dir),
+                )
                 state.meta["style_store_ingestion"] = ingestion
             else:
                 ingestion = {"summary": "mock 预览模式：跳过真实入库"}
@@ -368,7 +374,11 @@ class PipelineOrchestrator:
             state.campaign_strategy = campaign
             if persist_enabled:
                 self._persist_campaign(state.pipeline_id, campaign)
-                ingestion = ingest_campaign_styles(analysis, campaign, memory=self.memory)
+                ingestion = ingest_campaign_styles(
+                    analysis, campaign,
+                    memory=self.memory,
+                    data_dir=str(self.data_dir),
+                )
                 state.meta["style_store_ingestion"] = ingestion
             else:
                 ingestion = {"summary": "mock 预览模式：跳过真实入库"}

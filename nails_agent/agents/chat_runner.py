@@ -83,7 +83,11 @@ load_dotenv(Path.home() / ".hermes" / ".env", override=False)
 
 
 def _check_agents_available() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+    return bool(
+        os.environ.get("ANTHROPIC_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("MODELSCOPE_API_KEY")
+    )
 
 
 _AGENTS_AVAILABLE = _check_agents_available()
