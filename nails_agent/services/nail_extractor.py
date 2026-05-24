@@ -29,6 +29,7 @@ _DEFAULT_API_URL = "https://detect.roboflow.com"
 # Lazy import helpers
 # ---------------------------------------------------------------------------
 
+
 def _require_deps() -> None:
     """Raise a clear error if cv2 / numpy / inference_sdk are missing."""
     try:
@@ -51,6 +52,7 @@ def _require_deps() -> None:
 # ---------------------------------------------------------------------------
 # Internal helpers (match original extract_nails.py logic)
 # ---------------------------------------------------------------------------
+
 
 def _imread_unicode(path: str) -> Any:
     """Read an image from a path that may contain non-ASCII characters."""
@@ -121,6 +123,7 @@ def _extract_one_nail(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def extract_nail_crops(
     image_path: str | Path,
