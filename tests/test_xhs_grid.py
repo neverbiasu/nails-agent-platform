@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-import numpy as np
 from pathlib import Path
+
+import pytest
+
+# numpy/cv2 are optional in CI (kept out of the base install — see PR #6 which
+# lazy-imports them in the fetcher). Skip this module when numpy is unavailable.
+np = pytest.importorskip("numpy", reason="numpy required for grid image tests")
 
 from PIL import Image, ImageDraw
 
