@@ -87,6 +87,14 @@ tail -F logs/xhs_bridge.log   # just the xiaohongshu-mcp bridge
 tail -F logs/pipeline.log     # just the agent pipeline
 ```
 
+> **Note on reusing a bridge.** The live `[xhs-mcp]` stream comes from
+> `logs/xhs_bridge.log`, which is captured when **this script launches the
+> bridge**. If a bridge is already running on `:18060` (e.g. started by
+> `dev.sh` or by hand), the script reuses it but cannot redirect its output, so
+> `[xhs-mcp]` may stay quiet. To guarantee a live bridge stream, stop any
+> existing bridge first (`pkill -f xhs_rest_bridge`) and let the script start
+> its own.
+
 ## Troubleshooting
 
 **"probe search returned 0 results" / empty signals.**
