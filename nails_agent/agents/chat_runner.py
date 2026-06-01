@@ -614,10 +614,11 @@ class ChatPipelineRunner:
         )
         ctx["value_result"] = value_result
 
-        # asset_generator
+        # asset_generator (+ ComfyUI cover enhancement for the top-N drafts)
         t0 = _now_ms()
+        enhance_top_n = int(os.environ.get("COMFYUI_ENHANCE_TOP_N", "3"))
         try:
-            asset_result = asset_generator.generate(analysis)
+            asset_result = asset_generator.generate(analysis, enhance_top_n=enhance_top_n)
         except Exception as exc:
             events.append(
                 make_error(
@@ -629,13 +630,14 @@ class ChatPipelineRunner:
             )
             store["phase"] = "evaluating"
             return events
+        enhanced_count = sum(1 for d in asset_result.drafts if d.enhanced_image_url)
         events.append(
             make_tool_call(
                 tool="asset_generator.generate",
-                args={"top_trends": len(analysis.top_10)},
+                args={"top_trends": len(analysis.top_10), "enhance_top_n": enhance_top_n},
                 status="ok",
                 duration_ms=_now_ms() - t0,
-                result_summary=f"{len(asset_result.drafts)} card drafts",
+                result_summary=f"{len(asset_result.drafts)} card drafts · {enhanced_count} ComfyUI 增强封面",
             )
         )
         ctx["asset_result"] = asset_result
@@ -689,7 +691,7 @@ class ChatPipelineRunner:
                     title="素材卡片草稿",
                     items=[
                         GalleryItem(
-                            url=d.image_url or "",
+                            url=d.enhanced_image_url or d.image_url or "",
                             caption=d.style_name,
                             badge=f"P · {d.launch_priority_score:.0f}",
                         )

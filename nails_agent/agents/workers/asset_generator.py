@@ -10,8 +10,10 @@ Rule-based (no LLM call required for demo).
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone, timedelta
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 from nails_agent.models.schemas import (
     TrendAnalysisResult,
@@ -24,6 +26,8 @@ from nails_agent.models.schemas import (
 from nails_agent.services.trend_presentation import sample_label, signal_image_url, tag_summary
 
 _TZ8 = timezone(timedelta(hours=8))
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_log = logging.getLogger(__name__)
 
 # ── Caption templates ─────────────────────────────────────────────────────────
 
@@ -83,7 +87,64 @@ def _pricing(sig: TrendSignal) -> PricingInfo:
     )
 
 
-def generate(analysis: TrendAnalysisResult) -> AssetGenerationResult:
+def _resolve_local_image(sig: TrendSignal) -> Optional[str]:
+    """Resolve a draft's source image to a local file path the client can upload.
+
+    `signal_image_url` returns a local path when scraped images exist, else a remote
+    URL. ComfyUI upload needs a local file, so remote-only signals are skipped.
+    """
+    raw = signal_image_url(sig)
+    if not raw:
+        return None
+    p = Path(raw)
+    if p.exists():
+        return str(p)
+    alt = _PROJECT_ROOT / raw
+    if alt.exists():
+        return str(alt)
+    return None
+
+
+def _enhance_drafts(drafts: List[StyleCardDraft], signals: List[TrendSignal], top_n: int) -> int:
+    """Generate ComfyUI cover images for the top-N drafts in place.
+
+    Bounded by top_n to cap Cloud latency. Never raises — on any failure the draft
+    keeps its original image_url and enhanced_image_url stays empty. Returns the
+    number of drafts successfully enhanced.
+    """
+    if top_n <= 0:
+        return 0
+    try:
+        from nails_agent.tools.comfyui_client import ComfyUIClient
+    except Exception as exc:  # pragma: no cover - import guard
+        _log.warning("ComfyUI client unavailable, skipping enhancement: %s", exc)
+        return 0
+
+    client = ComfyUIClient()
+    if not client.api_key:
+        _log.info("COMFYUI_API_KEY missing, skipping image enhancement")
+        return 0
+
+    enhanced = 0
+    for draft, sig in list(zip(drafts, signals))[:top_n]:
+        src = _resolve_local_image(sig)
+        if not src:
+            _log.info("No local source image for %s, skipping enhancement", draft.style_name)
+            continue
+        try:
+            result = client.enhance(src, workflow="product_showcase")
+        except Exception as exc:
+            _log.warning("Enhancement raised for %s: %s", draft.style_name, exc)
+            continue
+        if result.get("success") and result.get("image_url"):
+            draft.enhanced_image_url = result["image_url"]
+            enhanced += 1
+        else:
+            _log.warning("Enhancement failed for %s: %s", draft.style_name, result.get("error"))
+    return enhanced
+
+
+def generate(analysis: TrendAnalysisResult, enhance_top_n: int = 0) -> AssetGenerationResult:
     drafts: List[StyleCardDraft] = []
 
     for i, sig in enumerate(analysis.top_10):
@@ -120,6 +181,8 @@ def generate(analysis: TrendAnalysisResult) -> AssetGenerationResult:
             pricing=_pricing(sig),
         )
         drafts.append(draft)
+
+    _enhance_drafts(drafts, list(analysis.top_10), enhance_top_n)
 
     return AssetGenerationResult(
         drafts=drafts,

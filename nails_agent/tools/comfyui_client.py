@@ -9,6 +9,7 @@ Fixed upload → submit → poll → CDN-URL flow.
 from __future__ import annotations
 
 import os
+import json
 import time
 import uuid
 import mimetypes
@@ -28,6 +29,28 @@ if load_dotenv:
     load_dotenv(_PROJECT_ROOT / ".env", override=False)
     if not os.environ.get("COMFYUI_API_KEY"):
         load_dotenv(Path.home() / ".hermes" / ".env", override=False)
+
+
+# Workflow registry — name → file + controllable node IDs. Keeps node IDs in one
+# place instead of scattered across call sites.
+_WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / "workflows"
+
+WORKFLOWS: Dict[str, Dict[str, Any]] = {
+    "tryon": {
+        "path": "nail_tryon_klein_9b.json",
+        "image_nodes": {"hand": "76", "style": "81"},
+    },
+    "product_showcase": {
+        "path": "product_showcase_firered_image_edit1_1.json",
+        "image_node": "143",
+        "prompt_node": "208",
+    },
+    "social_media": {
+        "path": "social_media_firered_image_edit1_1.json",
+        "image_node": "143",
+        "prompt_node": "192:187",
+    },
+}
 
 
 class ComfyUIClient:
@@ -229,6 +252,36 @@ class ComfyUIClient:
             "image_url": public_url,
             "duration_s": round(time.time() - t0, 1),
         }
+
+    # ── Workflow registry ────────────────────────────────────────────────────
+
+    def load_workflow(self, name: str) -> Dict[str, Any]:
+        """Load a registered workflow JSON by name (see WORKFLOWS)."""
+        spec = WORKFLOWS[name]
+        return json.loads((_WORKFLOWS_DIR / spec["path"]).read_text())
+
+    def enhance(
+        self,
+        image_path: str,
+        workflow: str = "product_showcase",
+        prompt: Optional[str] = None,
+        timeout: int = 180,
+    ) -> Dict[str, Any]:
+        """Enhance/generate a cover image from a single source image.
+
+        Uses a registered single-image workflow ("product_showcase" or
+        "social_media"). Returns {success, image_url, duration_s, error}.
+        """
+        spec = WORKFLOWS.get(workflow)
+        if not spec or "image_node" not in spec:
+            return {"success": False, "error": f"Unknown enhancement workflow: {workflow}"}
+        wf = self.load_workflow(workflow)
+        return self.run_workflow(
+            workflow=wf,
+            image_inputs={spec["image_node"]: image_path},
+            text_overrides={spec["prompt_node"]: prompt} if prompt else None,
+            timeout=timeout,
+        )
 
     # ── Workflow-specific convenience wrappers ───────────────────────────────
 

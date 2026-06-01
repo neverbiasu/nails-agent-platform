@@ -138,6 +138,7 @@ class StyleCardDraft(BaseModel):
     style_name: str
     style_tags: List[str] = []
     image_url: str = ""
+    enhanced_image_url: str = ""  # ComfyUI-generated cover; empty = enhancement skipped/failed
     launch_priority_score: float = 0.0
     platform_variants: Dict[str, PlatformVariant] = {}
     pricing: Optional[PricingInfo] = None
