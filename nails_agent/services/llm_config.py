@@ -8,7 +8,7 @@ Provider priority (first available wins):
 Both ModelScope and DashScope expose OpenAI-compatible `/v1/chat/completions`.
 Vision tagging uses a fallback chain (see vision_tag_configs): if one VL model
 returns 429 (quota) or 400 (no provider), the next candidate is tried.
-ModelScope VL chain: Qwen3-VL-8B → Qwen3-VL-30B → Qwen3-VL-235B → InternVL3.5-241B → QVQ-72B
+ModelScope VL chain: Qwen3-VL-8B(-Thinking) → Qwen3-VL-30B → ERNIE-4.5-VL-28B → Qwen3-VL-235B → InternVL3.5-241B → QVQ-72B
 DashScope vision:    qwen-vl-max
 OpenRouter vision:   qwen/qwen2.5-vl-72b-instruct:free
 """
@@ -143,12 +143,16 @@ def vision_tag_config() -> LLMEndpointConfig:
     return chain[0] if chain else LLMEndpointConfig()
 
 
-# ModelScope VL models verified working via API inference (probed 2026-05-29),
-# ordered fast/cheap → large/accurate. Used as the fallback chain when one model
-# returns 429 (quota) or 400 (no provider).
+# ModelScope VL models verified served via /v1/models + live image probe
+# (2026-06-01), ordered fast/cheap → large/accurate. Used as the fallback chain
+# when one model returns 429 (quota) or 400 (no provider). ModelScope's free
+# daily quota is per-model, so a cross-vendor entry (Baidu ERNIE) gives a real
+# fallback once the Qwen family is exhausted — not just another Qwen quota bucket.
 _MODELSCOPE_VL_CHAIN = (
     "Qwen/Qwen3-VL-8B-Instruct",
+    "Qwen/Qwen3-VL-8B-Thinking",
     "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "PaddlePaddle/ERNIE-4.5-VL-28B-A3B-PT",
     "Qwen/Qwen3-VL-235B-A22B-Instruct",
     "OpenGVLab/InternVL3_5-241B-A28B",
     "Qwen/QVQ-72B-Preview",
