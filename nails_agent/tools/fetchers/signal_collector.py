@@ -136,6 +136,27 @@ DEFAULT_NAIL_KEYWORDS = XHS_KEYWORDS
 # → stable Top 10 output even when a few detail calls fail with "Note not found".
 _PER_KW_LIMIT = 20
 
+# ── XHS collect cache ──────────────────────────────────────────────────────────
+# The XHS task opens many search/detail pages and is by far the slowest source.
+# When XHS_COLLECT_CACHE is truthy, the enriched XHS signals from one run are
+# written to disk and reused on subsequent runs within the TTL window, so dev
+# iterations (e.g. verifying the 9-grid crop) don't re-scrape every time. The
+# cache is NOT keyed on keywords — any fresh cache is reused — so live keyword
+# rotation is paused while the cache is warm. Delete the file or wait out the
+# TTL to force a fresh scrape.
+_XHS_CACHE_PATH = Path("web/output/cache/xhs_signals.json")
+
+
+def _xhs_cache_enabled() -> bool:
+    return os.environ.get("XHS_COLLECT_CACHE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _xhs_cache_ttl_min() -> int:
+    try:
+        return int(os.environ.get("XHS_COLLECT_CACHE_TTL_MIN", "360"))
+    except ValueError:
+        return 360
+
 
 class SignalCollector:
     """
@@ -233,6 +254,61 @@ class SignalCollector:
         status["mock"] = self._mock_data_available()
         return status
 
+    # ── XHS collect cache ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _load_xhs_cache() -> Optional[List[TrendSignal]]:
+        """Return cached XHS signals if a fresh cache exists, else None.
+
+        Invalidates the cache when it is older than the TTL or when the
+        referenced local image files have been wiped (stale paths would render
+        broken cards).
+        """
+        from datetime import datetime, timedelta
+
+        path = _XHS_CACHE_PATH
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            saved_at = datetime.fromisoformat(data["saved_at"])
+            if datetime.now() - saved_at > timedelta(minutes=_xhs_cache_ttl_min()):
+                logger.info("XHS cache expired (saved %s) — will re-scrape", data["saved_at"])
+                return None
+            signals = [TrendSignal.model_validate(s) for s in data.get("signals", [])]
+        except Exception as exc:
+            logger.warning("XHS cache unreadable (%s) — will re-scrape", exc)
+            return None
+        if not signals:
+            return None
+        # Guard against wiped images: if the first signal's local images are gone,
+        # the run output dir was cleared and the cache is stale.
+        first_paths = signals[0].local_image_paths or []
+        if first_paths and not any(Path(p).exists() for p in first_paths):
+            logger.info("XHS cache local images missing — will re-scrape")
+            return None
+        return signals
+
+    @staticmethod
+    def _save_xhs_cache(keywords: List[str], signals: List[TrendSignal]) -> None:
+        from datetime import datetime
+
+        if not signals:
+            return
+        try:
+            _XHS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "saved_at": datetime.now().isoformat(),
+                "keywords": list(keywords),
+                "signals": [s.model_dump(mode="json") for s in signals],
+            }
+            _XHS_CACHE_PATH.write_text(
+                json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+            )
+            logger.info("XHS cache written: %d signals → %s", len(signals), _XHS_CACHE_PATH)
+        except Exception as exc:
+            logger.warning("Failed to write XHS cache: %s", exc)
+
     # ── Collection ────────────────────────────────────────────────────────────
 
     def collect(
@@ -291,7 +367,18 @@ class SignalCollector:
         self.last_collection_sources = []
         self.last_collection_real_sources_attempted = False
 
-        if use_xhs:
+        cached_xhs: Optional[List[TrendSignal]] = None
+        if use_xhs and _xhs_cache_enabled():
+            cached_xhs = self._load_xhs_cache()
+            if cached_xhs is not None:
+                all_signals.extend(cached_xhs)
+                sources_used.append(f"xhs-cache({len(cached_xhs)})")
+                self.last_collection_real_sources_attempted = True
+                logger.info(
+                    "XHS: cache hit — %d signals, skipped live scrape", len(cached_xhs)
+                )
+
+        if use_xhs and cached_xhs is None:
             # Prefer real Chrome via CDP (avoids Playwright bot-detection rate-limits).
             # Falls back to XHS-MCP (Go bridge + Playwright) when CDP is unavailable.
             xhs_cdp = self._get_xhs_cdp()
@@ -351,7 +438,7 @@ class SignalCollector:
                 xhs_kws, limit_per_kw=limit_per_kw
             )
 
-        real_sources_attempted = bool(tasks)
+        real_sources_attempted = bool(tasks) or cached_xhs is not None
         self.last_collection_real_sources_attempted = real_sources_attempted
 
         # Execute tasks
@@ -368,6 +455,8 @@ class SignalCollector:
                             all_signals.extend(results)
                             sources_used.append(f"{name}({len(results)})")
                             logger.info("Source %s: %d signals", name, len(results))
+                            if name == "xhs" and _xhs_cache_enabled():
+                                self._save_xhs_cache(xhs_kws, results)
                     except Exception as e:
                         logger.error("Source %s failed: %s", name, e)
         else:
@@ -377,6 +466,8 @@ class SignalCollector:
                     if results:
                         all_signals.extend(results)
                         sources_used.append(f"{name}({len(results)})")
+                        if name == "xhs" and _xhs_cache_enabled():
+                            self._save_xhs_cache(xhs_kws, results)
                 except Exception as e:
                     logger.error("Source %s failed: %s", name, e)
 
