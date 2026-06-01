@@ -364,6 +364,13 @@ def _merge_detail_to_signal(
     )
 
 
+# Minimum full-width seam-discontinuity (relative to median) required at *both*
+# the 1/3 and 2/3 boundaries, in *both* axes, to call an image a 3×3 composite.
+# Tuned on real XHS data: genuine nail grids score ≈13–15×, while single photos,
+# posters and infographics stay ≤≈3.4×, so 4.0 sits in a wide, safe gap.
+GRID_SEAM_RATIO = 4.0
+
+
 class XHSMCPFetcher:
     """
     Fetches XHS data via the local Go xiaohongshu-mcp HTTP server.
@@ -557,25 +564,31 @@ class XHSMCPFetcher:
                     max_attempts=detail_retry_attempts,
                 )
                 if not detail:
-                    # Detail call failed (transient/HTTP error). Skip this candidate
-                    # so the backfill loop replaces it with the next-ranked one — a
-                    # failed detail is NOT a content rejection, so do not record it.
+                    # Detail call failed (transient / HTTP / bot-challenge). Keep the
+                    # shallow search signal — it still carries a cover image and
+                    # title-derived tags, so a flaky detail does not collapse the
+                    # Top-N. It stays detail_enriched=False; the Step-4 check below
+                    # skips (without recording) any shallow signal that still lacks
+                    # usable tags, letting the backfill loop replace it.
                     logger.info(
-                        "XHS-MCP detail failed — skipping for backfill: feed_id=%s keyword=%s",
+                        "XHS-MCP detail failed — keeping shallow signal: feed_id=%s keyword=%s",
                         feed.get("id") or sig.source_note_id,
                         kw,
                     )
+                    enriched = apply_tags(
+                        sig, signal_tag_dict(sig), sig.tag_source or "rules:title"
+                    )
+                    detailed.append(enriched)
                     continue
                 enriched = _merge_detail_to_signal(sig, detail, feed, kw)
                 if not enriched.detail_enriched:
                     # Detail returned but could not be parsed into a richer signal.
-                    # Treat like a failed detail: skip for backfill, do not reject.
+                    # Keep the shallow signal (same rationale as a failed detail).
                     logger.info(
-                        "XHS-MCP detail parse failed — skipping for backfill: feed_id=%s keyword=%s",
+                        "XHS-MCP detail parse failed — keeping shallow signal: feed_id=%s keyword=%s",
                         feed.get("id") or sig.source_note_id,
                         kw,
                     )
-                    continue
                 enriched = apply_tags(
                     enriched,
                     signal_tag_dict(enriched),
@@ -633,18 +646,29 @@ class XHSMCPFetcher:
                                 f"{enriched.tag_source}+vision:{vision_enricher.model}",
                             )
 
-                # Step 4: reject if still no usable tags after all enrichment
+                # Step 4: weak-tag handling.
                 reason = rejection_reason(signal_tag_dict(enriched))
                 if reason:
                     reason_code, reason_text = reason
-                    self.rejected_candidates.append(
-                        self._rejected_candidate(
-                            enriched,
-                            reason_code=reason_code,
-                            reason_text=reason_text,
+                    if not enriched.detail_enriched:
+                        # Shallow signal (detail failed) that still lacks usable
+                        # tags is an infra failure — skip it so the backfill loop
+                        # can replace it with a candidate whose detail succeeds.
+                        logger.info(
+                            "XHS-MCP shallow signal lacked tags — skipping for backfill: %s",
+                            enriched.source_note_id or enriched.trend_id,
                         )
+                        continue
+                    # Fully detail-enriched but below the tag floor: KEEP it. This
+                    # is what collapsed the Top-N to a single post — nearly every
+                    # enriched candidate fell below the 2-tag floor and was dropped,
+                    # leaving nothing to fill the grid. We keep it and recover tag
+                    # quality later via VLM, rather than discarding a valid post.
+                    logger.info(
+                        "XHS-MCP enriched signal below tag floor (%s) — keeping: %s",
+                        reason_code,
+                        enriched.source_note_id or enriched.trend_id,
                     )
-                    continue
 
                 signals.append(enriched)
                 accepted += 1
@@ -813,43 +837,37 @@ class XHSMCPFetcher:
             if ratio > 2.5 or ratio < 0.4:
                 return "wide_strip"
 
-            # 9-grid composites are large (≥ 600 px per side) and near-square
+            # A 3×3 composite needs enough pixels for 9 usable cells.
             if w < 600 or h < 600:
                 return "normal"
-            if not (0.85 <= ratio <= 1.18):
-                return "normal"
 
-            # Check for grid lines: average each row/column to a 1-D profile,
-            # then look for 2 valleys (the 3-col and 3-row separators).
+            # Detect a 3×3 composite by its seam signature: a real grid has a
+            # sharp, full-width discontinuity at *exactly* the 1/3 and 2/3
+            # boundaries in BOTH axes, because adjacent cells are independent
+            # photos. We measure the full-width mean adjacent-pixel difference at
+            # each third against the image's median difference. A single photo has
+            # no special discontinuity at thirds; posters/infographics spike at
+            # most one boundary. Requiring all four seams (both rows + both
+            # columns) to spike rejects them.  Aspect ratio is NOT used to gate —
+            # XHS grids are 3:4 portrait, identical to single photos, so the seam
+            # signature is the only reliable discriminator.
             with Image.open(path) as img:
-                gray = img.convert("L")
-                arr = np.array(gray, dtype=np.float32)
+                gray = np.asarray(img.convert("L"), dtype=np.float32)
 
-            col_mean = arr.mean(axis=0)  # mean brightness per column
-            row_mean = arr.mean(axis=1)  # mean brightness per row
+            row_diff = np.abs(np.diff(gray, axis=0)).mean(axis=1)  # per row-boundary
+            col_diff = np.abs(np.diff(gray, axis=1)).mean(axis=0)  # per col-boundary
 
-            def _count_troughs(profile: np.ndarray, n_expected: int = 2) -> int:
-                """Count valleys significantly below local mean in a 1-D profile."""
-                win = max(1, len(profile) // 20)
-                smooth = np.convolve(profile, np.ones(win) / win, mode="same")
-                # Median brightness as baseline; valleys are ≥ 8 pts below it
-                baseline = float(np.median(smooth))
-                threshold = baseline - 8.0
-                below = smooth < threshold
-                # Count contiguous runs below threshold
-                runs = 0
-                in_run = False
-                for v in below:
-                    if v and not in_run:
-                        runs += 1
-                        in_run = True
-                    elif not v:
-                        in_run = False
-                return runs
+            def _seam_spike(profile: np.ndarray, frac: float) -> float:
+                """Peak full-width discontinuity near `frac` vs median baseline."""
+                idx = int(round(len(profile) * frac))
+                win = max(1, len(profile) // 200)
+                local = float(profile[max(0, idx - win): idx + win + 1].max())
+                baseline = float(np.median(profile)) + 1e-6
+                return local / baseline
 
-            h_troughs = _count_troughs(col_mean)
-            v_troughs = _count_troughs(row_mean)
-            if h_troughs >= 2 and v_troughs >= 2:
+            h_seam = min(_seam_spike(row_diff, 1 / 3), _seam_spike(row_diff, 2 / 3))
+            v_seam = min(_seam_spike(col_diff, 1 / 3), _seam_spike(col_diff, 2 / 3))
+            if h_seam >= GRID_SEAM_RATIO and v_seam >= GRID_SEAM_RATIO:
                 return "grid9"
             return "normal"
 
@@ -944,46 +962,23 @@ class XHSMCPFetcher:
                     path.unlink(missing_ok=True)
                     continue
                 if kind == "grid9":
-                    # Prefer individual images from imageList over splitting the composite:
-                    # If the post has more URLs beyond this cover, they are individual
-                    # photos (higher quality). Download one of those instead.
-                    remaining_urls = signal.image_urls[idx:]  # URLs after the grid cover
-                    if remaining_urls:
-                        logger.info(
-                            "9-grid cover but post has %d individual images — downloading best individual instead: %s",
-                            len(remaining_urls),
-                            path.name,
-                        )
-                        path.unlink(missing_ok=True)
-                        # Download the first individual image
-                        for ind_url in remaining_urls[:1]:
-                            try:
-                                ind_r = self._session.get(
-                                    ind_url,
-                                    headers={
-                                        "User-Agent": "Mozilla/5.0",
-                                        "Referer": "https://www.xiaohongshu.com/",
-                                    },
-                                    timeout=20,
-                                )
-                                if ind_r.ok and ind_r.content:
-                                    ind_path = out_dir / f"{signal.trend_id}_{idx}_ind{path.suffix}"
-                                    ind_path.write_bytes(ind_r.content)
-                                    local_paths.append(str(ind_path))
-                                    logger.info("Individual image downloaded: %s", ind_path.name)
-                            except Exception as exc:
-                                logger.debug("Individual image download failed: %s", exc)
+                    # A 3×3 composite: crop out the best single-nail cell. We do
+                    # NOT detour to sibling URLs — in practice those are poster /
+                    # cover art (text overlays, props), so a clean cell from the
+                    # grid is the best single nail we can surface for this signal.
+                    logger.info("9-grid composite — splitting 3×3, picking best cell: %s", path.name)
+                    stem = f"{signal.trend_id}_{idx}"
+                    cells = self._split_grid9(path, out_dir, stem)
+                    path.unlink(missing_ok=True)
+                    if cells:
+                        local_paths.append(str(cells[0]))
+                        logger.info("Grid split → best cell: %s", cells[0].name)
+                        # The cover composite gave us a clean nail crop — that's our
+                        # representative image; stop before pulling poster siblings.
+                        if idx == 1:
+                            break
                     else:
-                        # Only the grid composite — split 3×3 and pick best cell
-                        logger.info("9-grid only image, splitting 3×3: %s", path.name)
-                        stem = f"{signal.trend_id}_{idx}"
-                        cells = self._split_grid9(path, out_dir, stem)
-                        path.unlink(missing_ok=True)
-                        if cells:
-                            local_paths.append(str(cells[0]))
-                            logger.info("Grid split → best cell: %s", cells[0].name)
-                        else:
-                            logger.warning("Grid split produced no cells for %s", path.name)
+                        logger.warning("Grid split produced no cells for %s", path.name)
                     continue
                 local_paths.append(str(path))
             except Exception as exc:

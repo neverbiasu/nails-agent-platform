@@ -73,6 +73,39 @@ def test_grid9_detected(tmp_path: Path):
     assert result == "grid9", f"Expected grid9, got {result}"
 
 
+def _make_portrait_grid9(tmp_path: Path, name: str = "pgrid.png", size=(900, 1200)) -> Path:
+    """3×3 grid of distinct solid-color cells abutting directly — no separator
+    lines, portrait 3:4 ratio. This mirrors the real XHS grid format (cells touch
+    with no gutter, e.g. 1080×1440) that the old ratio/trough detector missed."""
+    p = tmp_path / name
+    img = Image.new("RGB", size)
+    draw = ImageDraw.Draw(img)
+    cw, ch = size[0] // 3, size[1] // 3
+    colors = [
+        (40, 40, 40), (220, 220, 220), (120, 80, 160),
+        (200, 180, 160), (30, 160, 90), (240, 200, 40),
+        (80, 120, 200), (160, 40, 40), (200, 200, 120),
+    ]
+    k = 0
+    for r in range(3):
+        for c in range(3):
+            draw.rectangle([c * cw, r * ch, (c + 1) * cw - 1, (r + 1) * ch - 1], fill=colors[k])
+            k += 1
+    img.save(p)
+    return p
+
+
+def test_portrait_grid9_no_separators(tmp_path: Path):
+    """Portrait 3×3 grid whose cells abut directly (no gutter lines) → 'grid9'.
+
+    Real XHS composites are 3:4 portrait with cells touching, so the old
+    near-square ratio gate (0.85–1.18) rejected every one of them.
+    """
+    p = _make_portrait_grid9(tmp_path)
+    result = XHSMCPFetcher._classify_image(p)
+    assert result == "grid9", f"Expected grid9, got {result}"
+
+
 # ── _split_grid9 ───────────────────────────────────────────────────────────────
 
 def test_split_grid9_produces_cells(tmp_path: Path):
