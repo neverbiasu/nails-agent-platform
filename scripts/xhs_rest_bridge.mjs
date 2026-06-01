@@ -41,6 +41,36 @@ const { initDatabase } = await import(`${XHS_MCP_PKG}/dist/db/index.js`);
 const { getAccountPool } = await import(`${XHS_MCP_PKG}/dist/core/account-pool.js`);
 const { handleContentTools } = await import(`${XHS_MCP_PKG}/dist/tools/content.js`);
 
+// ── Fix xsec_source for search-derived tokens ───────────────────────────────
+// xhs-mcp's ContentService.getNote() hardcodes `xsec_source=pc_feed` when
+// navigating a note detail page. But every token we forward comes from SEARCH
+// results, and XHS binds a token to the channel that issued it: a search token
+// is only accepted with `xsec_source=pc_search`. The mismatch makes the detail
+// page render "Note not found", so enrichment (full imageList, desc, tags) fails
+// for nearly every candidate. We cannot pass a source through getNote()'s
+// signature, so we patch the one choke point all detail navigations share —
+// BrowserContextManager.newPage — to rewrite the query param on page.goto().
+try {
+  const { BrowserContextManager } = await import(
+    `${XHS_MCP_PKG}/dist/xhs/clients/context.js`
+  );
+  const _origNewPage = BrowserContextManager.prototype.newPage;
+  BrowserContextManager.prototype.newPage = async function patchedNewPage(...args) {
+    const page = await _origNewPage.apply(this, args);
+    const _origGoto = page.goto.bind(page);
+    page.goto = (url, opts) => {
+      if (typeof url === 'string' && url.includes('xsec_source=pc_feed')) {
+        url = url.replace('xsec_source=pc_feed', 'xsec_source=pc_search');
+      }
+      return _origGoto(url, opts);
+    };
+    return page;
+  };
+  console.error('[xhs-bridge] patched newPage → xsec_source=pc_search for detail');
+} catch (err) {
+  console.error('[xhs-bridge] WARN: could not patch xsec_source:', err.message);
+}
+
 // ── Init database and account pool (shared across all requests) ───────────────
 let db, pool;
 try {

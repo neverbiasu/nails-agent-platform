@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import streamlit as st
 
-# Make sibling files importable
+# Make sibling files (web/) and the repo root (for `nails_agent`) importable,
+# so `streamlit run web/chat_app.py` works without an editable install.
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import chat_state
 import chat_render

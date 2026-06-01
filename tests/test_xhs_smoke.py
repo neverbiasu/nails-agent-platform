@@ -184,6 +184,60 @@ class _FakeQuotaBackfillSession:
         )
 
 
+class _FakeShallowKeepSession:
+    """Detail fails for the top candidate, but its title already yields two
+    usable tags (裸色 + 法式), so the fetcher keeps it as a shallow
+    (detail_enriched=False) signal instead of dropping it for backfill."""
+
+    trust_env = False
+
+    def __init__(self):
+        self.post_calls = {}
+
+    def get(self, url, params=None, timeout=None):
+        feeds = []
+        titles = {"a": "a 裸色法式美甲", "b": "b 美甲", "c": "c 美甲"}
+        for idx, likes in (("a", "1000"), ("b", "900"), ("c", "800")):
+            feeds.append(
+                {
+                    "id": idx,
+                    "xsecToken": f"token-{idx}",
+                    "noteCard": {
+                        "displayTitle": titles[idx],
+                        "interactInfo": {
+                            "likedCount": likes,
+                            "collectedCount": "10",
+                            "commentCount": "1",
+                            "sharedCount": "1",
+                        },
+                    },
+                }
+            )
+        return _FakeResponse({"success": True, "data": {"feeds": feeds}})
+
+    def post(self, url, json=None, timeout=None):
+        feed_id = json["feed_id"]
+        self.post_calls[feed_id] = self.post_calls.get(feed_id, 0) + 1
+        if feed_id == "a":
+            return _FakeResponse({"success": False}, ok=False, status_code=500)
+        return _FakeResponse(
+            {
+                "success": True,
+                "data": {
+                    "data": {
+                        "note": {
+                            "noteId": feed_id,
+                            "title": f"{feed_id} detail",
+                            "desc": "#裸色美甲[话题]# #约会美甲[话题]#",
+                            "time": 1758533953000,
+                            "interactInfo": {"likedCount": "900", "collectedCount": "10"},
+                        }
+                    }
+                },
+            }
+        )
+
+
 # ──────────────────────────────────────────────
 # Unit tests — no bridge required
 # ──────────────────────────────────────────────
@@ -314,6 +368,35 @@ def test_search_backfills_only_missing_quota_after_detail_failures():
     assert "m" not in fake.post_calls
     assert "n" not in fake.post_calls
     assert "o" not in fake.post_calls
+    assert fetcher.rejected_candidates == []
+
+
+def test_search_keeps_shallow_signal_when_detail_fails_but_title_has_tags():
+    fetcher = XHSMCPFetcher()
+    fake = _FakeShallowKeepSession()
+    fetcher._session = fake
+
+    signals = fetcher.search(
+        keywords=["美甲"],
+        limit_per_kw=3,
+        detail_top_n=2,
+        detail_candidate_n=3,
+        detail_retry_attempts=2,
+        enrich_detail=True,
+        download_images=False,
+    )
+
+    # "a" detail fails but its title yields two usable tags, so it is kept as a
+    # shallow signal rather than dropped — the Top-2 does not collapse onto
+    # deeper picks, and "c" is never even fetched.
+    assert fake.post_calls["a"] == 2
+    by_id = {s.source_note_id: s for s in signals}
+    assert set(by_id) == {"a", "b"}
+    assert by_id["a"].detail_enriched is False
+    assert by_id["a"].color_tags == ["裸色"]
+    assert by_id["a"].style_tags == ["法式"]
+    assert by_id["b"].detail_enriched is True
+    assert "c" not in fake.post_calls
     assert fetcher.rejected_candidates == []
 
 
