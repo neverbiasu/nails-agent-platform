@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>现状对齐 · nails-agent-platform</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system,"PingFang SC",sans-serif; background:#f5f4f0; color:#1a1a1a; padding:40px 48px; }
+h1 { font-size:22px; font-weight:800; margin-bottom:6px; }
+.sub { color:#888; font-size:13px; margin-bottom:32px; }
+.section { margin-bottom:44px; }
+.section-title { font-size:15px; font-weight:800; padding-bottom:8px; border-bottom:2px solid #ece9e3; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.card { background:#fff; border:1px solid #ece9e3; border-radius:12px; overflow:hidden; margin-bottom:14px; }
+.card-head { background:#faf9f7; padding:12px 20px; border-bottom:1px solid #ece9e3; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.card-body { padding:16px 20px; font-size:13.5px; line-height:1.6; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:8px 14px; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#888; background:#faf9f7; border-bottom:1px solid #ece9e3; }
+td { padding:10px 14px; border-bottom:1px solid #f0ede8; vertical-align:top; }
+tr:last-child td { border-bottom:none; }
+.tag { display:inline-block; background:#f0ede8; color:#555; font-size:11px; padding:2px 7px; border-radius:4px; margin:1px; }
+.tag.g { background:#dcfce7; color:#166534; }
+.tag.b { background:#dbeafe; color:#1e40af; }
+.tag.y { background:#fef9c3; color:#854d0e; }
+.tag.r { background:#fee2e2; color:#991b1b; }
+.tag.p { background:#f3e8ff; color:#6b21a8; }
+code { background:#f0ede8; color:#7c3aed; font-size:12px; padding:1px 6px; border-radius:4px; font-family:"SF Mono",Menlo,monospace; }
+pre { background:#1e1e1e; color:#d4d4d4; border-radius:8px; padding:14px; font-family:"SF Mono",Menlo,monospace; font-size:12px; line-height:1.5; overflow-x:auto; margin:8px 0; }
+.note { background:#f0f4ff; border-left:3px solid #6366f1; padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; margin:10px 0; }
+.warn { background:#fffbeb; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; margin:10px 0; }
+.err  { background:#fef2f2; border-left:3px solid #ef4444; padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; margin:10px 0; }
+.ok   { background:#f0fdf4; border-left:3px solid #22c55e; padding:10px 14px; border-radius:0 8px 8px 0; font-size:13px; margin:10px 0; }
+
+/* pipeline flow */
+.pipeline { display:flex; align-items:flex-start; gap:0; flex-wrap:nowrap; overflow-x:auto; margin:16px 0; }
+.step { text-align:center; min-width:130px; }
+.step-box { background:#fff; border:1px solid #ece9e3; border-radius:10px; padding:12px 10px; margin:0 4px; font-size:12px; }
+.step-box.ok { border-color:#22c55e; background:#f0fdf4; }
+.step-box.warn { border-color:#f59e0b; background:#fffbeb; }
+.step-box.err { border-color:#ef4444; background:#fef2f2; }
+.step-num { font-size:10px; color:#888; margin-bottom:4px; }
+.step-name { font-weight:700; font-size:12px; margin-bottom:4px; }
+.step-status { font-size:11px; }
+.arrow { align-self:center; color:#aaa; font-size:22px; margin:0 2px; padding-bottom:4px; }
+
+/* image grid */
+.img-grid { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+.img-item { text-align:center; }
+.img-item img { border-radius:8px; border:1px solid #ece9e3; display:block; object-fit:cover; }
+.img-item .label { font-size:10px; color:#888; margin-top:4px; max-width:120px; }
+.img-item .title { font-size:11px; font-weight:700; max-width:120px; }
+
+/* db viz */
+.db-table { margin-bottom:12px; }
+.db-table-name { font-size:12px; font-weight:700; color:#6b21a8; margin-bottom:4px; }
+.db-row { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; padding:4px 0; border-bottom:1px solid #f0ede8; }
+.db-key { color:#888; min-width:120px; }
+.db-val { color:#1a1a1a; }
+.diff-old { color:#dc2626; text-decoration:line-through; opacity:.7; }
+.diff-new { color:#16a34a; font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>现状对齐报告</h1>
+<p class="sub">2026-05-28 · nails-agent-platform · fix/pipeline-quality 分支</p>
+
+<!-- ── 0. 一句话结论 ── -->
+<div class="section">
+  <div class="card">
+    <div class="card-body">
+      <div class="err" style="margin:0">
+        <strong>核心问题（3 条）</strong><br>
+        ① <strong>款式名称通用</strong>：Campaign Agent 只拿到 tag 标签（"法式"、"猫眼"）作为输入，输出 style_name = "法式甲"、"猫眼" 这类泛名；信号里已有的精确 <code>display_label</code>（如 "蓝色猫眼·夏日"）没有传进去。<br>
+        ② <strong>Tag 只靠规则</strong>：text LLM + Vision LLM 都已接好，但 <code>should_call_llm</code> 阈值太高（需 conf ≤ 0.7 或空分类 ≥ 2），大多数信号规则打完 conf = 0.71~0.9 就不再触发；颜色 tag 几乎全空。<br>
+        ③ <strong>Top10 重复款式</strong>：10 张 style card 里 7 张是"法式甲"或"猫眼"，缺多样性约束。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 1. Pipeline 流程 ── -->
+<div class="section">
+  <div class="section-title">🔄 Pipeline 四步流程（当前状态）</div>
+
+  <div class="pipeline">
+    <div class="step">
+      <div class="step-box warn">
+        <div class="step-num">XHS 采集</div>
+        <div class="step-name">Signal Collection</div>
+        <div class="step-status"><span class="tag y">8/10 ⚠</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="step-box ok">
+        <div class="step-num">Step 1</div>
+        <div class="step-name">Trend Analysis</div>
+        <div class="step-status"><span class="tag g">✓ display_label OK</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="step-box warn">
+        <div class="step-num">Step 2</div>
+        <div class="step-name">Value Eval + Assets</div>
+        <div class="step-status"><span class="tag y">color_tags 多空</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="step-box err">
+        <div class="step-num">Step 3</div>
+        <div class="step-name">Campaign Strategy</div>
+        <div class="step-status"><span class="tag r">style_name 通用</span></div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="step-box ok">
+        <div class="step-num">Step 4</div>
+        <div class="step-name">Ingestion + Report</div>
+        <div class="step-status"><span class="tag g">✓ 写入</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">XHS 采集层（Signal Collection）</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>项目</th><th>期望</th><th>实际</th><th>问题</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>抓取信号数</td>
+            <td>10</td>
+            <td><span class="tag y">8</span></td>
+            <td>2 条被 rejection_reason 拒（style+color 同时为空）</td>
+          </tr>
+          <tr>
+            <td>关键词</td>
+            <td>9 词 × 20 条 = 180</td>
+            <td><span class="tag g">✓ 已扩展到 9 词</span></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Tag 来源</td>
+            <td>rules → text LLM → VLM</td>
+            <td><span class="tag y">rules:detail 全部</span></td>
+            <td>LLM 运行了但 conf 门槛导致结果不叠加（见下）</td>
+          </tr>
+          <tr>
+            <td>图片下载</td>
+            <td>最多 3 张/信号</td>
+            <td><span class="tag g">✓ 58 张已下载</span></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>9宫格切割</td>
+            <td>有合集封面时切割</td>
+            <td><span class="tag y">代码已写，未 commit</span></td>
+            <td>普通搜索返回 640×853（非正方形），不触发。仅合集封面触发</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="warn" style="margin-top:12px">
+        <strong>Tag 门槛问题：</strong>
+        <code>should_call_llm(conf, tags)</code> 要求 <code>conf ≤ 0.7 OR 空分类 ≥ 2</code>。<br>
+        当前 8 条信号 conf 在 0.71~0.9，且 style_tags 有值，只有 1-2 空分类 → 大多数跳过 LLM。<br>
+        <strong>修复</strong>：降低 <code>color_tags</code> 为空时直接触发 vision；或把 LLM 阈值空分类改为 ≥ 1。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">Step 1 — Trend Analysis（TrendScoutAgent）</div>
+    <div class="card-body">
+      <p>✅ LLM 驱动，输出 <code>TrendAnalysisResult</code>。</p>
+      <p style="margin-top:8px">8 条信号经 LLM 聚合后，<code>top_10</code> 生成 8 个 <code>TrendSignal</code>，其中 <code>display_label</code> 字段：</p>
+      <div class="warn" style="margin-top:8px">
+        ⚠️ <code>top_10[*].display_label</code> 为空——TrendScout LLM 的输出 <code>TrendAnalysisResult</code> 里没有保留原始信号的 display_label，只有 <code>style_trends[*].tag</code>（如"法式"、"猫眼"）。<br>
+        这些 tag 就是后续 Campaign Agent 收到的全部信息。
+      </div>
+      <p style="margin-top:8px"><strong>但 trend_signals.json（持久化的原始信号）有正确的 display_label：</strong></p>
+      <table style="margin-top:8px">
+        <thead><tr><th>keyword</th><th>display_label ✅</th><th>style_tags</th><th>color_tags</th></tr></thead>
+        <tbody>
+          <tr><td>ins风美甲</td><td>法式</td><td>法式, ins风, 极简</td><td><span class="tag r">空</span></td></tr>
+          <tr><td>约会美甲</td><td>裸色渐变·日常</td><td>渐变, ins风</td><td>裸色</td></tr>
+          <tr><td>长甲美甲设计</td><td>猫眼·夏日</td><td>猫眼, 波点</td><td><span class="tag r">空</span></td></tr>
+          <tr><td>日常美甲</td><td>温柔·日常</td><td>温柔, 高级</td><td><span class="tag r">空</span></td></tr>
+          <tr><td>猫眼美甲</td><td>猫眼·约会</td><td>猫眼, 冰透, 温柔</td><td><span class="tag r">空</span></td></tr>
+          <tr><td>猫眼甲</td><td>蓝色猫眼·夏日</td><td>猫眼, 甜酷</td><td>蓝色</td></tr>
+          <tr><td>奶油色美甲</td><td>莫兰迪猫眼</td><td>猫眼</td><td>莫兰迪, 奶茶</td></tr>
+          <tr><td>长甲美甲设计</td><td>高级·约会</td><td>高级</td><td><span class="tag r">空</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">Step 3 — Campaign Strategy → style_name 通用问题</div>
+    <div class="card-body">
+      <p>Campaign Agent 接收到的上下文（<code>_format_trend_context</code>）：</p>
+      <pre>- **法式** | category: style | 帖数: 3 | 互动: 302,000 | 分: 91
+- **猫眼** | category: style | 帖数: 4 | 互动: 222,000 | 分: 88
+...</pre>
+      <p style="margin-top:8px">LLM 只知道 tag 名，没有 <code>display_label</code>、<code>color_tags</code>，输出：</p>
+      <pre>style_name: "法式甲"  ← 通用
+style_name: "猫眼"    ← 通用
+style_name: "法式甲"  ← 重复</pre>
+      <div class="err" style="margin-top:8px">
+        <strong>根因</strong>：<code>trend_analysis.top_10</code> 里的 TrendSignal 没有 display_label（LLM scout 返回时丢失了）；Campaign Agent 上下文也不包含 color_tags / display_label。
+      </div>
+      <div class="ok" style="margin-top:8px">
+        <strong>修复方向</strong>：① 在 campaign 上下文中加入 <code>display_label</code> + <code>color_tags</code>，让 LLM 生成 "蓝色猫眼·夏日" 这类名；② 或直接从原始信号取 display_label 作为 style_name 不走 LLM 命名。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 2. 数据库 ── -->
+<div class="section">
+  <div class="section-title">🗄 数据库结构（~/.nails_agent/memory.db）</div>
+  <div class="card">
+    <div class="card-body">
+      <table>
+        <thead><tr><th>表名</th><th>行数</th><th>用途</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>nail_styles_v2</code></td>
+            <td>15</td>
+            <td>主款式库（seed mock：STYLE001~015）</td>
+            <td><span class="tag y">全是 mock 数据</span></td>
+          </tr>
+          <tr>
+            <td><code>nail_styles_store</code></td>
+            <td><strong>0</strong></td>
+            <td>Pipeline 实时入库（sc_20260528_* 应写入这里）</td>
+            <td><span class="tag r">空！写入路径有问题</span></td>
+          </tr>
+          <tr>
+            <td><code>nail_visual_features</code></td>
+            <td>15</td>
+            <td>颜色向量、主色系（Roboflow 提取）</td>
+            <td><span class="tag y">全是 mock 数据，实时信号未提取</span></td>
+          </tr>
+          <tr>
+            <td><code>reference_hand_profiles</code></td>
+            <td>15</td>
+            <td>手型参考（seed）</td>
+            <td><span class="tag y">seed only</span></td>
+          </tr>
+          <tr>
+            <td><code>pipeline_runs</code></td>
+            <td>222</td>
+            <td>每次 pipeline 运行记录</td>
+            <td><span class="tag g">正常</span></td>
+          </tr>
+          <tr>
+            <td><code>event_log</code></td>
+            <td>908</td>
+            <td>Agent 事件日志</td>
+            <td><span class="tag g">正常</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note" style="margin-top:12px">
+        <strong>nail_styles_store 为何是空？</strong><br>
+        <code>ingest_campaign_styles</code> 写入 <code>data_dir/nail_styles_store.json</code>（默认 <code>web/data/</code>）并调用 <code>memory_store.put_style()</code>。<br>
+        实际写入的是 <strong><code>./data/nail_styles_store.json</code></strong>（25 条，含 sc_20260522_* 旧数据），但 <code>memory.db</code> 的 <code>nail_styles_store</code> 表一直是空——说明 <code>put_style</code> 调用到了不同的 MemoryStore 实例（不同 db_path），或在某次异常中断。
+      </div>
+
+      <div class="note" style="margin-top:8px">
+        <strong>data/nail_styles_store.json 里的款式名：</strong><br>
+        最新 sc_20260522_* 5 条：<code>style_name = ""</code>（空），<code>display_label = ""</code>（空）——这就是用户看到「通用」的直接原因。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">数据流路径</div>
+    <div class="card-body">
+      <pre style="font-size:11px">
+XHS 采集
+  └─ TrendSignal (display_label="猫眼·夏日", style_tags=["猫眼"])
+       └─ trend_signals.json  ✅ 写入 web/output/
+       └─ TrendAnalysisResult.top_10  ← display_label 在此丢失
+            └─ CampaignStrategyResult.style_cards  ← style_name = "猫眼" (泛)
+                 └─ ingest_campaign_styles()
+                      ├─ data/nail_styles_store.json  ✅ 写入（但 style_name 空）
+                      ├─ memory.db nail_styles_store   ❌ 0 行
+                      └─ nail_visual_features         ← Roboflow 提取（此时才有颜色）
+</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ── 3. 抓到的图片 ── -->
+<div class="section">
+  <div class="section-title">🖼 本次抓取结果（2026-05-28 · 8 信号 · 58 张图）</div>
+
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_28B8D9 · 法式 · ins风美甲 · ❤ 120,398</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item">
+          <img src="images/latest/raw/TREND_20260528_XHS_28B8D9_1.webp" width="120" height="120"/>
+          <div class="label">img 1</div>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <span class="tag">法式</span><span class="tag">ins风</span><span class="tag">极简</span>
+        <span class="tag r">color: 空</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_6E85E0 · 裸色渐变·日常 · 约会美甲 · ❤ 104,662</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_6E85E0_1.webp" width="120" height="120"/><div class="label">img 1</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_6E85E0_2.webp" width="120" height="120"/><div class="label">img 2</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_6E85E0_3.webp" width="120" height="120"/><div class="label">img 3</div></div>
+      </div>
+      <div style="margin-top:8px"><span class="tag">渐变</span><span class="tag">ins风</span><span class="tag b">裸色</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_083A41 · 猫眼·夏日 · 长甲美甲设计 · ❤ 77,000</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_083A41_1.webp" width="120" height="120"/><div class="label">img 1</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_083A41_2.webp" width="120" height="120"/><div class="label">img 2</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_083A41_3.webp" width="120" height="120"/><div class="label">img 3</div></div>
+      </div>
+      <div style="margin-top:8px"><span class="tag">猫眼</span><span class="tag">波点</span><span class="tag r">color: 空 → VLM 应补</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_4272AE · 蓝色猫眼·夏日 · 猫眼甲 · ❤ 50,000</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_4272AE_1.webp" width="120" height="120"/><div class="label">img 1</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_4272AE_2.webp" width="120" height="120"/><div class="label">img 2</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_4272AE_3.webp" width="120" height="120"/><div class="label">img 3</div></div>
+      </div>
+      <div style="margin-top:8px"><span class="tag">猫眼</span><span class="tag">甜酷</span><span class="tag b">蓝色</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_60D5CF · 莫兰迪猫眼 · 奶油色美甲 · ❤ 45,000</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_60D5CF_1.webp" width="120" height="120"/><div class="label">img 1</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_60D5CF_2.webp" width="120" height="120"/><div class="label">img 2</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_60D5CF_3.webp" width="120" height="120"/><div class="label">img 3</div></div>
+      </div>
+      <div style="margin-top:8px"><span class="tag">猫眼</span><span class="tag b">莫兰迪</span><span class="tag b">奶茶</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">其余 3 条信号</div>
+    <div class="card-body">
+      <div class="img-grid">
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_884BF7_1.webp" width="100" height="100"/><div class="title">温柔·日常</div><div class="label">日常美甲</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_C60F45_1.webp" width="100" height="100"/><div class="title">猫眼·约会</div><div class="label">猫眼美甲</div></div>
+        <div class="img-item"><img src="images/latest/raw/TREND_20260528_XHS_A5CBE7_1.webp" width="100" height="100"/><div class="title">高级·约会</div><div class="label">长甲美甲</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 4. 问题 + 修复计划 ── -->
+<div class="section">
+  <div class="section-title">🛠 问题清单 + 修复方向</div>
+
+  <div class="card">
+    <div class="card-head">① 款式名称通用（style_name = "法式甲"）</div>
+    <div class="card-body">
+      <p><strong>根因：</strong>Campaign Agent 上下文只有 tag 字符串（"法式"、"猫眼"），不知道具体的 display_label 和 color_tags。</p>
+      <div class="ok" style="margin-top:8px">
+        <strong>修复：</strong>在 <code>_format_trend_context()</code> 里，对每个 StyleTrend 附加对应信号的 <code>display_label</code> + <code>color_tags</code>；LLM prompt 中要求输出 "蓝色猫眼·夏日" 而非泛名。<br>
+        同时在 <code>_build_style_card</code> 里保留 <code>display_label</code> 字段。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">② Tag 补全：VLM 应补 color_tags</div>
+    <div class="card-body">
+      <p>VisionTagEnricher 已实现且 API key 已配（ModelScope Qwen2.5-VL-72B）。<br>
+      问题在于 <code>should_call_llm</code> 判断门槛：<code>conf ≤ 0.7 OR 空分类 ≥ 2</code>。</p>
+      <p>当 style_tags 有 2 条时 conf = 0.71，空分类（color、material、scene）= 3 → 理论上触发。但<strong>文本 LLM 先跑，返回了空 tag（被 clean_tag 过滤），conf 没变</strong>，vision 也触发了但同样结果空。</p>
+      <div class="ok" style="margin-top:8px">
+        <strong>修复：</strong>① <code>color_tags</code> 空时强制触发 vision（不依赖 conf 门槛）；② <code>clean_tag</code> 长度上限从 8 放宽到 12（"奶油裸粉"、"冷灰蓝色" 等被截断）；③ vision prompt 明确要求先写颜色。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">③ 9宫格切割（已写，未 commit）</div>
+    <div class="card-body">
+      <p>切割逻辑已在 <code>xhs_mcp_fetcher.py</code> 里写好（未 commit）：</p>
+      <ul style="padding-left:20px; margin-top:8px">
+        <li>若帖子有合集封面（1080×1080 近正方形）<strong>且后续有单图</strong> → 直接下单图，丢合集封面</li>
+        <li>若只有合集封面 → 切割 3×3，Laplacian 选最清晰 cell</li>
+      </ul>
+      <div class="warn" style="margin-top:8px">
+        <strong>注意：</strong>XHS 搜索接口返回的封面是 640×853（ratio 0.75），永远不触发 grid9 检测。只有用户主动制作的"合集封面"（1080×1080）才触发。关键词中加入"美甲款式合集"可提升命中率。
+      </div>
+      <div class="ok" style="margin-top:8px"><strong>操作：</strong>立即 commit 这段代码。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">④ Top10 重复款式</div>
+    <div class="card-body">
+      <p>10 张 style card 里：法式甲 ×4，猫眼 ×4，高级 ×1，渐变 ×1。</p>
+      <div class="ok" style="margin-top:8px">
+        <strong>修复：</strong>① Campaign Agent prompt 加约束"每种 style tag 最多 2 张"；② 在 <code>_format_trend_context</code> 里去重，同 tag 的多条信号只保留最高热度的 1 条。
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">⑤ nail_styles_store 写入（memory.db 一直为空）</div>
+    <div class="card-body">
+      <p><code>ingest_campaign_styles</code> 调用 <code>memory_store.put_style()</code>，但 <code>nail_styles_store</code> 表是 0 行。</p>
+      <p style="margin-top:8px">调查方向：<code>MemoryStore()</code> 默认用 <code>~/.nails_agent/memory.db</code>，而 pipeline 里 <code>self.memory = memory or MemoryStore()</code>——应该是同一实例。需要确认 ingest 的 <code>memory</code> 参数传递是否正确。</p>
+      <div class="ok" style="margin-top:8px"><strong>临时做法</strong>：在 pipeline 跑完后验证 <code>nail_styles_store</code> 行数，如果仍为 0 则在 ingest 里加日志定位。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">Notion 文档要点 → 实现状态</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>Notion 要点</th><th>实现状态</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>不管能否提取手型，都进主库</td>
+            <td><span class="tag g">✅ ingest 不依赖 Roboflow 成功</span></td>
+          </tr>
+          <tr>
+            <td>shape_tag（长/中/短甲）</td>
+            <td><span class="tag g">✅ nail_feature_extractor 已返回 nail_shape_tag</span></td>
+          </tr>
+          <tr>
+            <td>color_tags 用抠图后的指甲颜色</td>
+            <td><span class="tag y">⚠ Roboflow crop 已接，但实时信号未提取（仅入库时跑）</span></td>
+          </tr>
+          <tr>
+            <td>VLM 补全 tag</td>
+            <td><span class="tag y">⚠ 代码已接，但 clean_tag 过滤太严导致效果不显著</span></td>
+          </tr>
+          <tr>
+            <td>9宫格图识别 + 切割</td>
+            <td><span class="tag y">⚠ 逻辑已写，未 commit</span></td>
+          </tr>
+          <tr>
+            <td>style_name 具体化</td>
+            <td><span class="tag r">❌ Campaign Agent 上下文缺 display_label，输出仍通用</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 5. 优化方向 ── -->
+<div class="section">
+  <div class="section-title">📐 正确优化方向</div>
+  <div class="card">
+    <div class="card-body">
+      <table>
+        <thead><tr><th>优先级</th><th>改动</th><th>文件</th><th>预期效果</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tag r">P0</span></td>
+            <td>commit 9宫格切割代码</td>
+            <td><code>xhs_mcp_fetcher.py</code></td>
+            <td>合集封面切割上线</td>
+          </tr>
+          <tr>
+            <td><span class="tag r">P0</span></td>
+            <td>Campaign context 加 display_label + color_tags</td>
+            <td><code>campaign_agent.py</code></td>
+            <td>style_name = "蓝色猫眼·夏日"</td>
+          </tr>
+          <tr>
+            <td><span class="tag r">P0</span></td>
+            <td>color_tags 空时强制 vision 补全</td>
+            <td><code>tag_enricher.py</code></td>
+            <td>5+ 条信号补上颜色</td>
+          </tr>
+          <tr>
+            <td><span class="tag y">P1</span></td>
+            <td><code>clean_tag</code> 长度上限 8→12</td>
+            <td><code>tag_enricher.py</code></td>
+            <td>颜色词不再被截断</td>
+          </tr>
+          <tr>
+            <td><span class="tag y">P1</span></td>
+            <td>Campaign 多样性约束（同 tag ≤ 2 张）</td>
+            <td><code>campaign_agent.py</code></td>
+            <td>Top10 不再全是法式+猫眼</td>
+          </tr>
+          <tr>
+            <td><span class="tag b">P2</span></td>
+            <td>确认 nail_styles_store 写入路径</td>
+            <td><code>style_store_ingestion.py</code></td>
+            <td>memory.db 里有真实数据</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

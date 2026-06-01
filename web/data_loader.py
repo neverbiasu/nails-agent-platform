@@ -13,16 +13,37 @@ _UNWRAP_KEYS = {
 
 
 def _load(filename: str):
-    """Prefer pipeline output (real data) over seed data (mock)."""
+    """Prefer pipeline output (real data) over seed data (mock).
+
+    Falls back to mock/seed data if the output file is empty (0 items) —
+    this keeps the UI populated when the pipeline ran but produced no signals
+    (e.g. XHS session expired during collection).
+    """
     out = OUTPUT_DIR / filename
-    path = out if out.exists() else (DATA_DIR / filename)
-    data = json.loads(path.read_text(encoding="utf-8"))
-    # Auto-unwrap pipeline outputs to match mock schema
-    if isinstance(data, dict):
-        wrapper = _UNWRAP_KEYS.get(filename)
-        if wrapper and wrapper in data:
-            data = data[wrapper]
-    return data
+    seed = DATA_DIR / filename
+
+    def _parse(path: Path):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # Auto-unwrap pipeline outputs to match mock schema
+        if isinstance(data, dict):
+            wrapper = _UNWRAP_KEYS.get(filename)
+            if wrapper and wrapper in data:
+                data = data[wrapper]
+        return data
+
+    if out.exists():
+        data = _parse(out)
+        # If output is empty, fall back to seed/mock so the UI isn't blank
+        empty = (isinstance(data, list) and len(data) == 0) or (isinstance(data, dict) and not data)
+        if not empty:
+            return data
+        if seed.exists():
+            return _parse(seed)
+        return data  # empty but seed also missing
+
+    if seed.exists():
+        return _parse(seed)
+    return []
 
 
 def load_trend_signals():

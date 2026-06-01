@@ -83,7 +83,11 @@ load_dotenv(Path.home() / ".hermes" / ".env", override=False)
 
 
 def _check_agents_available() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENROUTER_API_KEY"))
+    return bool(
+        os.environ.get("ANTHROPIC_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("MODELSCOPE_API_KEY")
+    )
 
 
 _AGENTS_AVAILABLE = _check_agents_available()
@@ -385,58 +389,26 @@ class ChatPipelineRunner:
 
         ctx["signals"] = signals
 
-        # ── Step 1: trend analysis (agent or rule-based) ──────────────────
+        # ── Step 1: trend analysis — always derived from the signals we just
+        # collected (top_10 ranked by engagement + aggregated style_trends).
+        #
+        # The LLM TrendScoutAgent used to re-scrape here on its own and drive the
+        # displayed Top-10 from *that* separate pass. It collapsed to a couple of
+        # posts with generic names and no local images, diverging from the real
+        # collection. We now rank the collector's enriched signals directly, so
+        # the Top-10 always reflects what we actually scraped. LLM naming /
+        # commentary happens later in Step 2 (campaign), not by re-scraping here.
         t0 = _now_ms()
-        if self.use_agents:
-            events.append(
-                make_tool_call(
-                    tool="TrendScoutAgent.run",
-                    args={"mode": "LLM", "platforms": ["xhs", "douyin"]},
-                    status="ok",
-                    duration_ms=0,
-                    result_summary="agent启动中…",
-                )
-            )
-            try:
-                from nails_agent.agents.trend_agent import run_trend_scout
-
-                agent_events: List[ChatEvent] = []
-
-                def _agent_prog(msg: str) -> None:
-                    agent_events.append(
-                        make_progress(
-                            phase="collecting",
-                            text=msg,
-                        )
-                    )
-
-                analysis = run_trend_scout(
-                    focus_keywords=kws,
-                    progress_cb=_agent_prog,
-                )
-                events.extend(agent_events)
-                # TrendScoutAgent already collected data; use top_10 as signal proxy
-                ctx["signals"] = analysis.top_10  # TrendSignal list from agent
-            except Exception as exc:
-                events.append(
-                    make_error(
-                        phase="collecting",
-                        message=f"TrendScoutAgent 失败，回退规则模式: {exc}",
-                        recoverable=True,
-                    )
-                )
-                analysis = trend_analyst.analyse(signals)
-        else:
-            analysis = trend_analyst.analyse(signals)
+        analysis = trend_analyst.analyse(signals)
 
         events.append(
             make_tool_call(
-                tool="trend_analyst.analyse" if not self.use_agents else "TrendScoutAgent.analyse",
+                tool="trend_analyst.analyse",
                 args={"signals_in": len(ctx["signals"])},
                 status="ok",
                 duration_ms=_now_ms() - t0,
-                result_summary=f"top {len(analysis.style_trends or analysis.top_10)} styles · "
-                f"{len(analysis.patterns)} patterns",
+                result_summary=f"top {len(analysis.top_10)} samples · "
+                f"{len(analysis.style_trends)} styles · {len(analysis.patterns)} patterns",
             )
         )
         ctx["analysis"] = analysis
@@ -453,6 +425,10 @@ class ChatPipelineRunner:
 
     def _phase_trends_review(self, store: Dict[str, Any]) -> List[ChatEvent]:
         ctx = store["context"]
+        # Guard: collecting phase may have returned early (empty signals) without
+        # setting ctx["analysis"]. In that case there's nothing to review.
+        if "analysis" not in ctx:
+            return []
         analysis = ctx["analysis"]
         signals = ctx["signals"]
 
@@ -598,6 +574,8 @@ class ChatPipelineRunner:
 
     def _phase_evaluating(self, store: Dict[str, Any]) -> List[ChatEvent]:
         ctx = store["context"]
+        if "analysis" not in ctx:
+            return []
         analysis = ctx["analysis"]
         state = self._get_pipeline_state(store)
         state.status = "running"

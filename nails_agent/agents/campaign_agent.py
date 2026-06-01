@@ -46,7 +46,12 @@ def run_campaign_agent(
     context = _format_trend_context(trend_result, max_cards)
     user_msg = (
         f"为以下热门美甲款式生成完整运营策略。\n\n{context}\n\n"
-        f"生成最多 {max_cards} 款的风格卡片，每款都要有三平台文案。"
+        "要求：\n"
+        f"1. 生成最多 {max_cards} 款不同风格的卡片，每款都要有三平台文案。\n"
+        "2. style_name 必须具体，使用「颜色·风格」或「工艺·场景」格式，"
+        "例如「蓝色猫眼·夏日」「裸粉渐变·通勤」「极简法式·约会」，"
+        "禁止用「法式甲」「猫眼」这类泛名。\n"
+        "3. 同一 tag 类型（如猫眼）最多出现 2 张卡片，确保整体多样性。\n"
         "完成后调用 finalise_campaign。"
     )
 
@@ -58,9 +63,7 @@ def run_campaign_agent(
         if progress_cb:
             progress_cb("🤖 CampaignAgent 启动 (Qwen3)…")
 
-        asyncio.get_event_loop().run_until_complete(
-            _run_with_progress(agent, user_msg, progress_cb, max_turns)
-        )
+        asyncio.run(_run_with_progress(agent, user_msg, progress_cb, max_turns))
     except Exception as exc:
         logger.exception("CampaignAgent failed: %s", exc)
         if progress_cb:
@@ -71,29 +74,62 @@ def run_campaign_agent(
 
 
 async def _run_with_progress(agent, user_msg: str, progress_cb, max_turns: int):
-    from agents import Runner
+    from nails_agent.agents.agent_config import run_streamed_with_fallback
 
-    async with Runner.run_streamed(agent, user_msg, max_turns=max_turns) as stream:
-        async for event in stream.stream_events():
-            if hasattr(event, "type") and event.type == "run_item_stream_event":
-                item = event.item
-                if hasattr(item, "raw_item"):
-                    ri = item.raw_item
-                    name = getattr(ri, "name", "") if hasattr(ri, "name") else ""
-                    if name and progress_cb:
-                        progress_cb(f"🔧 {name}(…)")
-    return stream.final_output
+    return await run_streamed_with_fallback(agent, user_msg, progress_cb, max_turns)
 
 
 def _format_trend_context(result: "TrendAnalysisResult", max_styles: int) -> str:
+    # Build a map from style tag → best matching signal (for display_label / color info)
+    tag_to_signal: dict = {}
+    for sig in result.top_10:
+        for tag in sig.style_tags or []:
+            if tag and tag not in tag_to_signal:
+                tag_to_signal[tag] = sig
+
     lines = ["## 趋势数据（按热度排序）"]
-    for st in result.style_trends[:max_styles]:
+
+    # Deduplicate by display_label to avoid repeating the same signal; also
+    # cap same style-tag to 2 entries to ensure diversity.
+    seen_labels: set = set()
+    tag_card_count: dict = {}
+    shown = 0
+    for st in result.style_trends:
+        if shown >= max_styles:
+            break
+        sig = tag_to_signal.get(st.tag)
+        display = sig.display_label if sig and sig.display_label else st.tag
+        # Skip if this display_label was already emitted
+        if display in seen_labels:
+            continue
+        # Skip if this raw tag has hit its card cap
+        if tag_card_count.get(st.tag, 0) >= 2:
+            continue
+        seen_labels.add(display)
+        tag_card_count[st.tag] = tag_card_count.get(st.tag, 0) + 1
+        shown += 1
+
+        colors = ", ".join(sig.color_tags) if sig and sig.color_tags else ""
+        color_str = f" | 颜色: {colors}" if colors else ""
         lines.append(
-            f"- **{st.tag}** | category: {st.category} | "
+            f"- **{display}** | tag: {st.tag} | category: {st.category} | "
             f"帖数: {st.post_count} | 互动: {st.total_engagement:,} | "
-            f"分: {st.aggregated_score:.0f}"
+            f"分: {st.aggregated_score:.0f}{color_str}"
             + (f'\n  样本文案: "{st.sample_caption[:60]}"' if st.sample_caption else "")
         )
+
+    # If style_trends is empty or short, fall back to top_10 signals directly
+    if shown == 0:
+        seen_labels: set = set()
+        for sig in result.top_10[:max_styles]:
+            label = sig.display_label or (sig.style_tags[0] if sig.style_tags else sig.keyword)
+            if label in seen_labels:
+                continue
+            seen_labels.add(label)
+            colors = ", ".join(sig.color_tags) if sig.color_tags else ""
+            color_str = f" | 颜色: {colors}" if colors else ""
+            lines.append(f"- **{label}** | 关键词: {sig.keyword}{color_str} | 点赞: {sig.likes:,}")
+
     if result.patterns:
         lines.append("\n## 观察到的模式")
         for p in result.patterns[:3]:
@@ -177,18 +213,46 @@ def _rule_based_fallback(trend_result, progress_cb) -> "CampaignStrategyResult":
     from nails_agent.agents.workers.campaign_strategist import generate_campaign
     from nails_agent.models.schemas import ValueEvaluationResult, MetricSnapshot
 
-    snapshots = [
-        MetricSnapshot(
-            rank=i + 1,
-            keyword=st.tag,
-            trend_id=st.tag,
-            external_heat_score=min(100, st.aggregated_score),
-            trend_growth_score=50.0,
-            style_gap_score=50.0,
-            launch_priority_score=min(100, st.aggregated_score),
-        )
-        for i, st in enumerate(trend_result.style_trends[:6])
-    ]
+    # IMPORTANT: use top_10 signals so the trend_id values match what
+    # gen_assets() produces from the same top_10 list.  The original code used
+    # st.tag as trend_id which caused a mismatch → all scores defaulted to 50 → P0=0.
+    signals = trend_result.top_10[:6]
+    if signals:
+        # TrendSignal carries `composite_score`; fall back to raw engagement
+        # (likes+comments+shares+collects) when the score wasn't computed.
+        def _score(s) -> float:
+            if getattr(s, "composite_score", 0):
+                return float(s.composite_score)
+            return float((s.likes or 0) + (s.comments or 0) + (s.shares or 0) + (s.collects or 0))
+
+        max_score = max((_score(s) for s in signals), default=1.0) or 1.0
+        snapshots = [
+            MetricSnapshot(
+                rank=i + 1,
+                keyword=sig.keyword,
+                trend_id=sig.trend_id,
+                external_heat_score=round(min(100.0, _score(sig) / max_score * 100), 1),
+                trend_growth_score=50.0,
+                style_gap_score=50.0,
+                launch_priority_score=round(min(100.0, _score(sig) / max_score * 100), 1),
+            )
+            for i, sig in enumerate(signals)
+        ]
+    else:
+        # Fallback when top_10 is empty: use style_trends (trend_ids won't match
+        # gen_assets drafts but there are also no drafts in that case).
+        snapshots = [
+            MetricSnapshot(
+                rank=i + 1,
+                keyword=st.tag,
+                trend_id=st.tag,
+                external_heat_score=min(100, st.aggregated_score),
+                trend_growth_score=50.0,
+                style_gap_score=50.0,
+                launch_priority_score=min(100, st.aggregated_score),
+            )
+            for i, st in enumerate(trend_result.style_trends[:6])
+        ]
     value_eval = ValueEvaluationResult(snapshots=snapshots)
     return generate_campaign(trend_result, value_eval)
 

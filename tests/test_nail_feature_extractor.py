@@ -4,7 +4,9 @@ import pytest
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-pytest.importorskip("cv2", reason="OpenCV not installed; skipping visual feature tests (needs .[consumer] extras)")
+pytest.importorskip(
+    "cv2", reason="OpenCV not installed; skipping visual feature tests (needs .[consumer] extras)"
+)
 
 from nails_agent.services.nail_feature_extractor import extract_nail_visual_features
 

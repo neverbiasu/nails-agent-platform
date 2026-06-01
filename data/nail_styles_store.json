@@ -801,5 +801,93 @@
     "status": "listed",
     "created_at": "2026-05-22T22:22:43.417587",
     "updated_at": "2026-05-22T22:23:06+08:00"
+  },
+  {
+    "style_id": "cat_eye_nude_transparent",
+    "source_trend_id": "cat_eye_nude_transparent",
+    "source_title": "裸粉冰透·通勤",
+    "image_url": "",
+    "enhanced_image_url": "",
+    "source_platform": "trend_generated",
+    "is_available_for_try_on": true,
+    "reference_hand_profile_id": "RHP_CAT_EYE_NUDE_TRANSPARENT",
+    "visual_feature_id": null,
+    "style_tags": [
+      "裸粉冰透·通勤"
+    ],
+    "color_tags": [],
+    "material_tags": [],
+    "scene_tags": [],
+    "shape_tags": [],
+    "is_trend_generated": true,
+    "status": "candidate",
+    "created_at": "2026-05-31T22:09:30.190910",
+    "updated_at": "2026-05-31T22:09:39+08:00"
+  },
+  {
+    "style_id": "cat_eye_polka_dots_summer",
+    "source_trend_id": "cat_eye_polka_dots_summer",
+    "source_title": "银蓝波点·夏日",
+    "image_url": "",
+    "enhanced_image_url": "",
+    "source_platform": "trend_generated",
+    "is_available_for_try_on": true,
+    "reference_hand_profile_id": "RHP_CAT_EYE_POLKA_DOTS_SUMMER",
+    "visual_feature_id": null,
+    "style_tags": [
+      "银蓝波点·夏日"
+    ],
+    "color_tags": [],
+    "material_tags": [],
+    "scene_tags": [],
+    "shape_tags": [],
+    "is_trend_generated": true,
+    "status": "candidate",
+    "created_at": "2026-05-31T22:09:30.190955",
+    "updated_at": "2026-05-31T22:09:39+08:00"
+  },
+  {
+    "style_id": "french_tip_creamy",
+    "source_trend_id": "french_tip_creamy",
+    "source_title": "奶白法式·极简",
+    "image_url": "",
+    "enhanced_image_url": "",
+    "source_platform": "trend_generated",
+    "is_available_for_try_on": true,
+    "reference_hand_profile_id": "RHP_FRENCH_TIP_CREAMY",
+    "visual_feature_id": null,
+    "style_tags": [
+      "奶白法式·极简"
+    ],
+    "color_tags": [],
+    "material_tags": [],
+    "scene_tags": [],
+    "shape_tags": [],
+    "is_trend_generated": true,
+    "status": "candidate",
+    "created_at": "2026-05-31T22:09:30.190977",
+    "updated_at": "2026-05-31T22:09:39+08:00"
+  },
+  {
+    "style_id": "nude_ombre_daily",
+    "source_trend_id": "nude_ombre_daily",
+    "source_title": "裸粉渐变·日常",
+    "image_url": "",
+    "enhanced_image_url": "",
+    "source_platform": "trend_generated",
+    "is_available_for_try_on": true,
+    "reference_hand_profile_id": "RHP_NUDE_OMBRE_DAILY",
+    "visual_feature_id": null,
+    "style_tags": [
+      "裸粉渐变·日常"
+    ],
+    "color_tags": [],
+    "material_tags": [],
+    "scene_tags": [],
+    "shape_tags": [],
+    "is_trend_generated": true,
+    "status": "candidate",
+    "created_at": "2026-05-31T22:09:30.191023",
+    "updated_at": "2026-05-31T22:09:39+08:00"
   }
 ]

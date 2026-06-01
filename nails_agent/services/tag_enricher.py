@@ -82,7 +82,7 @@ def clean_tag(tag: Any) -> str:
     if any(part in raw for part in _DROP_CONTAINS):
         return ""
     # Tags should be compact concepts, not phrases/sentences.
-    if len(raw) > 8:
+    if len(raw) > 12:
         return ""
     return raw
 
@@ -125,6 +125,11 @@ def tag_confidence(tags: Dict[str, List[str]]) -> float:
 
 
 def should_call_llm(tags: Dict[str, List[str]], confidence: float) -> bool:
+    cleaned = clean_tag_dict(tags)
+    # Always enrich when color_tags is empty — color is critical for display and
+    # rule-based extraction misses it most of the time.
+    if not cleaned.get("color_tags"):
+        return True
     return confidence <= 0.7 or empty_tag_category_count(tags) >= 2
 
 
@@ -253,9 +258,9 @@ class QwenTagEnricher:
             "请抽取四类标签，字段固定为 style_tags、color_tags、material_tags、scene_tags。\n"
             "要求：\n"
             "1. 只抽取原文明确提到或强相关的短标签，不要创造新概念。\n"
-            "2. 不要输出“美甲、好看、显白、推荐、教程、分享、合集、爆款、种草”等泛词。\n"
+            "2. 不要输出「美甲、好看、显白、推荐、教程、分享、合集、爆款、种草」等泛词。\n"
             "3. 如果某类没有明确依据，返回空数组。\n"
-            "4. 每个标签尽量为 2-4 个汉字的短词，例如“法式、猫眼、裸色、亮片、约会”。\n"
+            "4. 每个标签尽量为 2-4 个汉字的短词，例如「法式、猫眼、裸色、亮片、约会」。\n"
             "5. 只返回 JSON，例如：\n"
             '{"style_tags":["法式"],"color_tags":["裸色"],"material_tags":[],"scene_tags":[]}'
         )
@@ -269,17 +274,21 @@ class QwenTagEnricher:
             }
             for s in signals
         ]
+        example = (
+            '{"items":[{"source_note_id":"xxx","style_tags":[],'
+            '"color_tags":[],"material_tags":[],"scene_tags":[]}]}'
+        )
         return (
             "请为 items 中每条美甲内容分别抽取四类标签。\n"
             "字段固定为 style_tags、color_tags、material_tags、scene_tags。\n"
             "要求：\n"
-            "1. 只抽取每条原文明确提到或强相关的短标签，不要创造新概念。\n"
-            "2. 不要输出“美甲、好看、显白、推荐、教程、分享、合集、爆款、种草”等泛词。\n"
-            "3. 如果某类没有明确依据，返回空数组。\n"
-            "4. 每个标签尽量为 2-4 个汉字的短词，例如“法式、猫眼、裸色、亮片、约会”。\n"
-            "5. 必须保留每条输入的 source_note_id，用它对齐结果；不要靠顺序。\n"
-            "6. 只返回 JSON，格式如下：\n"
-            '{"items":[{"source_note_id":"xxx","style_tags":[],"color_tags":[],"material_tags":[],"scene_tags":[]}]}\n\n'
+            "1. color_tags 重点关注：根据标题和文案中提到的颜色词填写，如裸粉、奶油白、蓝色、莫兰迪等。\n"
+            "2. 只抽取每条原文明确提到或强相关的短标签，不要创造新概念。\n"
+            "3. 不要输出美甲、好看、显白、推荐、教程、分享、合集、爆款、种草等泛词。\n"
+            "4. 如果某类没有明确依据，返回空数组。\n"
+            "5. 每个标签为 2-6 个汉字的短词，例如法式、猫眼、裸色、奶油白、亮片、约会。\n"
+            "6. 必须保留每条输入的 source_note_id，用它对齐结果；不要靠顺序。\n"
+            f"7. 只返回 JSON，格式如下：\n{example}\n\n"
             f"items:\n{json.dumps(items, ensure_ascii=False, indent=2)}"
         )
 
@@ -328,4 +337,208 @@ def enrich_signal_tags(
         merged = merge_tag_dict(rule_tags, llm_tags)
         source = f"{source}+llm:{enricher.model}" if any(llm_tags.values()) else source
         return apply_tags(signal, merged, source)
+    return apply_tags(signal, rule_tags, source)
+
+
+# ── Vision-based tag enrichment ───────────────────────────────────────────────
+
+_VISION_SYSTEM = (
+    "你是一个专业美甲视觉分析师。根据用户提供的美甲图片，"
+    "提取四类标签：style_tags（款式）、color_tags（颜色）、"
+    "material_tags（材料/工艺）、scene_tags（适用场景）。\n"
+    "要求：\n"
+    "1. color_tags 必须填写，描述图片中指甲的实际颜色，例如：裸粉、奶油白、蓝色、莫兰迪灰、豆沙色。\n"
+    "2. 只描述图片中明确可见的特征，不要臆测。\n"
+    "3. 每个标签为 2-6 个汉字短词（例如：猫眼、法式、裸粉、深蓝色、莫兰迪、亮片、约会）。\n"
+    "4. 不要输出「美甲」「好看」「显白」「推荐」等泛词。\n"
+    "5. 不确定的类别返回空数组，但 color_tags 必须至少填一个。\n"
+    "6. 只输出 JSON，格式：\n"
+    '{"style_tags":[],"color_tags":[],"material_tags":[],"scene_tags":[]}'
+)
+
+
+class VisionTagEnricher:
+    """Extract nail tags from a downloaded image using a vision LLM (Qwen-VL)."""
+
+    def __init__(
+        self,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout: int = 45,
+    ):
+        from nails_agent.services.llm_config import (
+            LLMEndpointConfig,
+            vision_tag_configs,
+        )
+
+        # Explicit caller override pins a single endpoint (no fallback).
+        if model or api_key or base_url:
+            self.candidates: List[LLMEndpointConfig] = [
+                LLMEndpointConfig(
+                    model=model or "",
+                    api_key=api_key or "",
+                    base_url=(base_url or "").rstrip("/"),
+                )
+            ]
+        else:
+            self.candidates = vision_tag_configs()
+        self.timeout = timeout
+
+    @property
+    def available(self) -> bool:
+        return any(c.available for c in self.candidates)
+
+    @property
+    def model(self) -> str:
+        """Preferred (first) model — kept for backward-compatible logging."""
+        return self.candidates[0].model if self.candidates else ""
+
+    def extract_from_image(self, image_path: str) -> Dict[str, List[str]]:
+        """Return tag dict extracted from *image_path* via vision API.
+
+        Tries each candidate endpoint in priority order, advancing to the next
+        on quota (429) / no-provider (400) / transport errors. Returns an empty
+        dict on total failure so callers can fall through to rule-based tags.
+        """
+        empty: Dict[str, List[str]] = {field: [] for field in TAG_FIELDS}
+        if not self.available:
+            logger.debug("VisionTagEnricher: no API config, skipping")
+            return empty
+
+        import base64
+        from pathlib import Path as _Path
+
+        path = _Path(image_path)
+        if not path.exists():
+            logger.debug("VisionTagEnricher: image not found: %s", image_path)
+            return empty
+
+        try:
+            raw = path.read_bytes()
+            b64 = base64.b64encode(raw).decode()
+            suffix = path.suffix.lower().lstrip(".")
+            mime = {
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "png": "image/png",
+                "webp": "image/webp",
+            }.get(suffix, "image/jpeg")
+            data_url = f"data:{mime};base64,{b64}"
+        except Exception as exc:
+            logger.warning("VisionTagEnricher: failed to read image %s: %s", image_path, exc)
+            return empty
+
+        messages = [
+            {"role": "system", "content": _VISION_SYSTEM},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                    {"type": "text", "text": "请分析这张美甲图片并提取标签。"},
+                ],
+            },
+        ]
+
+        last_error = "no candidates"
+        for cfg in self.candidates:
+            if not cfg.available:
+                continue
+            try:
+                resp = requests.post(
+                    f"{cfg.base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {cfg.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"model": cfg.model, "temperature": 0, "messages": messages},
+                    timeout=self.timeout,
+                )
+                if not resp.ok:
+                    last_error = f"HTTP {resp.status_code}: {resp.text[:160]}"
+                    # 429 = quota, 400 = no provider / bad model → try next model.
+                    if resp.status_code in (400, 402, 404, 429, 503):
+                        logger.info(
+                            "VisionTagEnricher: %s unavailable (%s), trying next model",
+                            cfg.model,
+                            last_error,
+                        )
+                        continue
+                    logger.warning(
+                        "VisionTagEnricher HTTP %d for %s via %s: %s",
+                        resp.status_code,
+                        path.name,
+                        cfg.model,
+                        resp.text[:200],
+                    )
+                    continue
+                content = resp.json()["choices"][0]["message"]["content"]
+                parsed = QwenTagEnricher._parse_json(content)
+                result = clean_tag_dict(parsed)
+                if any(result.values()):
+                    logger.debug("VisionTagEnricher: %s succeeded for %s", cfg.model, path.name)
+                    return result
+                last_error = "empty tag result"
+            except Exception as exc:
+                last_error = str(exc)
+                logger.info(
+                    "VisionTagEnricher: %s errored (%s), trying next model",
+                    cfg.model,
+                    last_error,
+                )
+                continue
+
+        logger.warning(
+            "VisionTagEnricher: all %d candidate models failed for %s (last: %s)",
+            len(self.candidates),
+            path.name,
+            last_error,
+        )
+        return empty
+
+
+def enrich_signal_tags_with_vision(
+    signal: TrendSignal,
+    image_path: str | None,
+    *,
+    use_llm: bool = True,
+    text_enricher: QwenTagEnricher | None = None,
+    vision_enricher: VisionTagEnricher | None = None,
+) -> TrendSignal:
+    """Full enrichment pipeline: rule-based → text LLM → vision LLM.
+
+    Steps:
+    1. Clean existing rule-based tags from signal.
+    2. If tags look insufficient, call text LLM (Qwen) on title+caption.
+    3. If tags are still insufficient AND an image is available, call vision LLM.
+    4. Merge results, apply, return updated signal.
+    """
+    rule_tags = clean_tag_dict(signal_tag_dict(signal))
+    confidence = tag_confidence(rule_tags)
+    source = signal.tag_source or "rules"
+
+    # Step 2: text LLM enrichment
+    if use_llm and should_call_llm(rule_tags, confidence):
+        te = text_enricher or QwenTagEnricher()
+        if te.available:
+            llm_tags = te.extract(signal)
+            rule_tags = merge_tag_dict(rule_tags, llm_tags)
+            if any(llm_tags.values()):
+                source = f"{source}+llm:{te.model}"
+            confidence = tag_confidence(rule_tags)
+
+    # Step 3: vision enrichment when tags still missing and image available
+    if image_path and should_call_llm(rule_tags, confidence):
+        ve = vision_enricher or VisionTagEnricher()
+        if ve.available:
+            vision_tags = ve.extract_from_image(image_path)
+            if any(vision_tags.values()):
+                rule_tags = merge_tag_dict(rule_tags, vision_tags)
+                source = f"{source}+vision:{ve.model}"
+                logger.info(
+                    "Vision tags for %s: %s",
+                    signal.trend_id,
+                    {k: v for k, v in vision_tags.items() if v},
+                )
+
     return apply_tags(signal, rule_tags, source)

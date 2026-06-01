@@ -32,6 +32,7 @@ consumer = [
     "mediapipe==0.10.14",
     "opencv-contrib-python>=4.13.0",
     "numpy>=1.26",
+    "inference-sdk>=0.30",
 ]
 demo = [
     "streamlit>=1.35",

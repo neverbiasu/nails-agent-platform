@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>美甲 Agent — 技术细节文档</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #f7f6f2;
+  color: #1a1a1a;
+  line-height: 1.6;
+}
+
+/* ── Nav sidebar ── */
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: #1a1a1a; color: #ccc;
+  padding: 28px 0;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid #333; margin-bottom: 16px; }
+.sidebar-logo span { font-size: 13px; font-weight: 700; color: #c8a87a; }
+.sidebar-logo p { font-size: 11px; color: #555; margin-top: 3px; }
+.nav-section { padding: 4px 20px; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #444; margin-top: 12px; }
+.nav-item { display: block; padding: 7px 20px; font-size: 13px; color: #999; text-decoration: none; cursor: pointer; transition: all .15s; }
+.nav-item:hover, .nav-item.active { background: #252525; color: #fff; border-left: 2px solid #c8a87a; }
+
+/* ── Content ── */
+.content { flex: 1; padding: 40px 48px; max-width: 960px; }
+h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+.page-sub { color: #888; font-size: 14px; margin-bottom: 36px; }
+
+/* ── Section ── */
+.section { margin-bottom: 48px; }
+.section-title {
+  font-size: 18px; font-weight: 800; margin-bottom: 4px;
+  padding-bottom: 10px; border-bottom: 2px solid #ece9e3;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-sub { font-size: 13px; color: #888; margin-bottom: 18px; }
+
+/* ── Answer card ── */
+.answer-box {
+  background: #fff3cd; border: 1px solid #ffc107;
+  border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;
+  font-size: 14px;
+}
+.answer-box strong { color: #856404; }
+
+/* ── Info blocks ── */
+.card {
+  background: #fff; border: 1px solid #ece9e3; border-radius: 12px;
+  overflow: hidden; margin-bottom: 16px;
+}
+.card-head {
+  background: #faf9f7; padding: 12px 20px;
+  border-bottom: 1px solid #ece9e3;
+  font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+}
+.card-body { padding: 16px 20px; font-size: 13.5px; }
+.card-body p { margin-bottom: 10px; }
+.card-body p:last-child { margin-bottom: 0; }
+
+/* ── Code block ── */
+pre {
+  background: #1e1e1e; color: #d4d4d4;
+  border-radius: 8px; padding: 14px 16px; overflow-x: auto;
+  font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+  line-height: 1.55; margin: 10px 0;
+}
+code {
+  background: #f0ede8; color: #7c3aed;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 12px; padding: 1px 6px; border-radius: 4px;
+}
+pre code { background: none; color: inherit; padding: 0; }
+
+/* ── Flow diagram ── */
+.flow {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+  margin: 12px 0;
+}
+.flow-step {
+  background: #fff; border: 1.5px solid #d0ccc4;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 12.5px; font-weight: 600; text-align: center;
+  min-width: 90px;
+}
+.flow-step.highlight { background: #1a1a1a; color: #c8a87a; border-color: #1a1a1a; }
+.flow-step.warn { background: #fff3cd; border-color: #ffc107; }
+.flow-step.ok { background: #dcfce7; border-color: #22c55e; }
+.flow-arrow { color: #aaa; font-size: 18px; padding: 0 6px; }
+
+/* ── Table ── */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; padding: 8px 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #888;
+  background: #faf9f7; border-bottom: 1px solid #ece9e3;
+}
+td { padding: 10px 14px; border-bottom: 1px solid #f0ede8; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+
+/* ── Tag ── */
+.tag { display: inline-block; background: #f0ede8; color: #555; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin: 1px 2px; }
+.tag.r { background: #fee2e2; color: #991b1b; }
+.tag.g { background: #dcfce7; color: #166534; }
+.tag.b { background: #dbeafe; color: #1e40af; }
+.tag.y { background: #fef9c3; color: #854d0e; }
+
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill-ok { background: #dcfce7; color: #166534; }
+.pill-warn { background: #fff3cd; color: #856404; }
+
+.note { background: #f0f4ff; border-left: 3px solid #6366f1; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; margin: 10px 0; }
+
+ul { padding-left: 18px; }
+li { margin-bottom: 5px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <span>🛠 技术文档</span>
+    <p>nails-agent-platform</p>
+  </div>
+  <div class="nav-section">数据源</div>
+  <a class="nav-item" href="#xhs-stack">XHS 技术栈说明</a>
+  <a class="nav-item" href="#signal-count">信号数量问题</a>
+  <div class="nav-section">核心模块</div>
+  <a class="nav-item" href="#image-split">9宫格切割</a>
+  <a class="nav-item" href="#tag-system">Tag 打标系统</a>
+  <a class="nav-item" href="#roboflow">Roboflow 集成</a>
+  <div class="nav-section">开发规范</div>
+  <a class="nav-item" href="#no-mock">禁用 Mock 规范</a>
+  <a class="nav-item" href="#file-index">文件索引</a>
+</div>
+
+<!-- ── Main content ── -->
+<div class="content">
+  <h1>美甲 Agent — 技术细节文档</h1>
+  <p class="page-sub">2026-05-28 · 覆盖四大模块技术实现、当前限制及开发规范</p>
+
+  <!-- ═══ 1. XHS 技术栈 ═══ -->
+  <div class="section" id="xhs-stack">
+    <div class="section-title">① XHS 数据源：为什么不再用 xiaohongshu-mcp？</div>
+    <p class="section-sub">原始 Node.js MCP vs. 当前 Go + Bridge 架构</p>
+
+    <div class="answer-box">
+      <strong>直接回答：</strong>我们仍然在用 xiaohongshu-mcp，只是换了实现。现在运行的 <code>scripts/xhs_rest_bridge.mjs</code> 就是对 <code>@sillyl12324/xhs-mcp</code>（Node.js 包）的包装。Go 服务器方案是过去讨论过的替代路线，但目前并未启用。
+    </div>
+
+    <div class="card">
+      <div class="card-head">🔧 当前实际运行的 XHS 技术栈</div>
+      <div class="card-body">
+        <div class="flow">
+          <div class="flow-step highlight">xhs_mcp_fetcher.py<br><small>Python 调用方</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">HTTP REST<br>:18060</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step highlight">xhs_rest_bridge.mjs<br><small>Node.js 桥接层</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">@sillyl12324/xhs-mcp<br><small>npm 包（内部）</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">Playwright<br>Chromium</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step warn">XHS.com<br><small>⚠ 会限流</small></div>
+        </div>
+        <p style="margin-top:12px">进程确认（实测）：</p>
+        <pre>PID 94421: node scripts/xhs_rest_bridge.mjs --port 18060
+PID 92870: node xhs-mcp  ← npm 包的底层进程（Playwright）</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">❓ 为什么频繁出现"请求太频繁"</div>
+      <div class="card-body">
+        <p>根本原因：<code>@sillyl12324/xhs-mcp</code> 在内部启动 <strong>Playwright Chromium</strong>，这是一个 headless 浏览器。XHS 服务器能通过 UserAgent、fingerprint、行为模式识别出自动化浏览器，触发频率限制。</p>
+        <p>表现：<code>page.waitForFunction: Timeout 30000ms exceeded</code> — XHS 返回了非 React 页面（限流落地页），<code>__INITIAL_STATE__</code> 不存在，等待超时。</p>
+        <table style="margin-top:8px">
+          <thead><tr><th>方案</th><th>原理</th><th>被限流风险</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>@sillyl12324/xhs-mcp<br>（Playwright Chromium）</td>
+              <td>启动独立 headless 浏览器，JS 渲染后读 <code>__INITIAL_STATE__</code></td>
+              <td><span class="tag r">高</span> — 特征明显</td>
+              <td><span class="pill pill-warn">当前使用 / fallback</span></td>
+            </tr>
+            <tr>
+              <td>XHSCDPFetcher<br>（真实 Chrome CDP）</td>
+              <td>附加到用户已登录的真实 Chrome，复用真实会话</td>
+              <td><span class="tag g">极低</span> — 无法区分正常用户</td>
+              <td><span class="pill pill-ok">已实现 / 需开启 Chrome</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:12px">开启真实 Chrome 方法：<code>open -a "Google Chrome" --args --remote-debugging-port=9222</code>，然后登录 xiaohongshu.com。pipeline 会自动切换到 CDP 模式，<code>source_status()</code> 中 <code>xhs_cdp: True</code>。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📡 XHS API 端点详情</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>端点</th><th>方法</th><th>参数</th><th>返回</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>/health</code></td>
+              <td>GET</td>
+              <td>—</td>
+              <td><code>{"ok":true}</code></td>
+              <td>存活检测</td>
+            </tr>
+            <tr>
+              <td><code>/api/v1/login/status</code></td>
+              <td>GET</td>
+              <td>—</td>
+              <td><code>{"is_logged_in":true,"account_count":1}</code></td>
+              <td>登录状态检查（<code>is_available()</code> 调用）</td>
+            </tr>
+            <tr>
+              <td><code>/api/v1/feeds/search</code></td>
+              <td>GET</td>
+              <td><code>?keyword=猫眼美甲</code></td>
+              <td><code>{"success":true,"data":{"feeds":[...]}}</code></td>
+              <td>关键词搜索，返回约 20 条 feed（搜索页翻页数量限制）</td>
+            </tr>
+            <tr>
+              <td><code>/api/v1/feeds/list</code></td>
+              <td>GET</td>
+              <td>—</td>
+              <td>首页推荐流</td>
+              <td>获取首页趋势内容</td>
+            </tr>
+            <tr>
+              <td><code>/api/v1/feeds/detail</code></td>
+              <td>POST</td>
+              <td><code>{"feed_id":"xxx","xsec_token":"xxx"}</code></td>
+              <td>完整 note 数据（多图 URL、完整 caption、hashtag 列表）</td>
+              <td>单条 detail 拉取，<strong>最容易触发限流</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top:10px">Detail 端点内部调用 <code>xhs_get_note</code>，导航到 <code>https://xiaohongshu.com/explore/{noteId}?xsec_token=...</code> 后等待 <code>__INITIAL_STATE__.note.noteDetailMap</code>。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2. 信号数量 ═══ -->
+  <div class="section" id="signal-count">
+    <div class="section-title">② Top 8 信号为什么不到 10？</div>
+    <p class="section-sub">信号收集流程与过滤漏斗</p>
+
+    <div class="answer-box">
+      <strong>直接回答：</strong>上次测试跑时手动把 <code>xhs_detail_candidate_n=5</code>（默认 15）和 <code>detail_top_n=10</code> 留在默认，但因为部分 detail 拉取超时被丢弃，最终只有 8 条通过。正常生产跑每轮应有 60-70 条候选，Top 10 完全可以达到。
+    </div>
+
+    <div class="card">
+      <div class="card-head">📊 信号漏斗（实测数字）</div>
+      <div class="card-body">
+        <div class="flow" style="flex-direction:column; align-items:flex-start; gap:6px;">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="flow-step ok" style="width:180px">搜索：7 关键词 × 10<br>= 70 条原始 feed</div>
+            <span style="color:#888;font-size:12px">（镭射美甲 0 条，实得 60 条）</span>
+          </div>
+          <div style="padding-left:20px;color:#aaa">↓ 去重</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="flow-step" style="width:180px">去重后：~56 条候选</div>
+          </div>
+          <div style="padding-left:20px;color:#aaa">↓ 按互动分排序，取 top <code>max(detail_top_n=10, detail_candidate_n=5)</code> = 10</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="flow-step warn" style="width:180px">发 detail 请求：10 条</div>
+            <span style="color:#888;font-size:12px">（测试时 candidate_n 设了 5，所以只发了 10）</span>
+          </div>
+          <div style="padding-left:20px;color:#aaa">↓ 1 条 "Note not found"，1 条超时 → 降级用 search-level 数据</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="flow-step ok" style="width:180px">最终输出：8 条</div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:12px">
+          <strong>生产建议参数：</strong><br>
+          <code>limit_per_kw=20</code> · <code>detail_candidate_n=20</code> · <code>detail_top_n=10</code><br>
+          这样候选池 ~120 条，detail 请求 20 条，最终稳定输出 10 条。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">⚙ 关键参数说明</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>参数</th><th>默认值</th><th>测试时用值</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>limit_per_kw</code></td><td>10</td><td>10</td><td>每个关键词最多取多少条 feed 进入候选池</td></tr>
+            <tr><td><code>detail_candidate_n</code></td><td>15</td><td>5</td><td>从排序后的候选中最多考虑多少条发 detail 请求（扩大此值 = 更多 detail 机会）</td></tr>
+            <tr><td><code>detail_top_n</code></td><td>10</td><td>10</td><td>最终目标输出条数，detail 成功数达到这个数就停止</td></tr>
+            <tr><td><code>xhs_use_llm_tags</code></td><td>True</td><td>False</td><td>是否调用 Qwen/VLM 补全 tag（False = 纯规则，速度快）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 3. 9宫格切割 ═══ -->
+  <div class="section" id="image-split">
+    <div class="section-title">③ 9宫格图片检测与切割</div>
+    <p class="section-sub">文件：<code>nails_agent/tools/fetchers/xhs_mcp_fetcher.py</code> → <code>_classify_image()</code> / <code>_split_grid9()</code></p>
+
+    <div class="card">
+      <div class="card-head">🔍 检测算法：<code>_classify_image(path)</code> → "grid9" | "wide_strip" | "normal"</div>
+      <div class="card-body">
+        <p>XHS 9宫格合图是把 9 张单甲照拼成一张正方形图发布，无法靠宽高比区分（和普通单图宽高比相同）。检测逻辑分三层过滤：</p>
+        <table style="margin:10px 0">
+          <thead><tr><th>步骤</th><th>条件</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td>1. 宽高比检测</td><td>ratio &gt; 2.5 or &lt; 0.4</td><td>→ <code>wide_strip</code>（丢弃）</td></tr>
+            <tr><td>2. 尺寸下限</td><td>w &lt; 600 or h &lt; 600</td><td>→ <code>normal</code>（太小不可能是9宫格）</td></tr>
+            <tr><td>3. 近正方形</td><td>ratio 不在 0.85–1.18</td><td>→ <code>normal</code></td></tr>
+            <tr><td>4. 网格线检测</td><td>列均值曲线有 ≥2 个谷值 AND 行均值曲线有 ≥2 个谷值</td><td>→ <code>grid9</code> ✓</td></tr>
+          </tbody>
+        </table>
+        <p><strong>谷值检测原理：</strong>把图片转灰度 → 对每列/每行取像素平均 → 卷积平滑 → 找连续低于中位数 8 个灰度单位的区域。9宫格的分割线（通常是白色或黑色细线）会在亮度曲线上形成明显波谷。</p>
+        <pre>col_mean = arr.mean(axis=0)   # 每列平均亮度
+row_mean = arr.mean(axis=1)   # 每行平均亮度
+# 如果横竖各有 ≥2 个波谷 → 判定为9宫格</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">✂ 切割算法：<code>_split_grid9(path)</code> → 返回最清晰的 ≤2 张</div>
+      <div class="card-body">
+        <p>切割为均匀 3×3 九宫格，对每个 cell 计算清晰度分数，返回最高分的 1-2 个（避免重复选同位置）。</p>
+        <pre># 均匀切割
+cw, ch = w // 3, h // 3
+for row in range(3):
+    for col in range(3):
+        box = (col*cw, row*ch, (col+1)*cw, (row+1)*ch)
+        cell = img.crop(box)
+
+# 清晰度：Laplacian 算子方差（越高越清晰）
+kx = [[0,1,0],[1,-4,1],[0,1,0]]  # Laplacian kernel
+lap_var = variance(abs(convolve(gray, kx)))
+
+# 综合分 = lap_var * cell_area（大格子加权）
+# 最终返回 top 1-2 个 cell</pre>
+        <div class="note">切割后的 cell 图保存为 <code>{stem}_cell{row}_{col}.webp</code>，替换原始合图参与后续的视觉特征提取和 tag 打标。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 4. Tag 打标系统 ═══ -->
+  <div class="section" id="tag-system">
+    <div class="section-title">④ Tag 打标系统（三层递进）</div>
+    <p class="section-sub">文件：<code>nails_agent/services/tag_enricher.py</code> + <code>nails_agent/services/tag_rules.py</code></p>
+
+    <div class="card">
+      <div class="card-head">🏷 Tag 字段结构</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>字段</th><th>含义</th><th>示例</th></tr></thead>
+          <tbody>
+            <tr><td><code>style_tags</code></td><td>款式/工艺风格</td><td>法式、猫眼、渐变、波点、蝴蝶结</td></tr>
+            <tr><td><code>color_tags</code></td><td>颜色</td><td>裸色、蓝色、白色、多巴胺</td></tr>
+            <tr><td><code>material_tags</code></td><td>材料/工艺手法</td><td>亮片、猫眼粉、光疗、镭射</td></tr>
+            <tr><td><code>scene_tags</code></td><td>使用场景</td><td>约会、日常、夏日、通勤、婚礼</td></tr>
+            <tr><td><code>tag_source</code></td><td>来源标注</td><td>rules:title / rules:detail / rules:detail+llm:qwen / +vision:qwen-vl</td></tr>
+            <tr><td><code>tag_confidence</code></td><td>置信度 0-1</td><td>0.4（rules纯规则）→ 0.75（LLM补全后）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">🔄 三层打标流程</div>
+      <div class="card-body">
+        <div class="flow" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="flow-step ok" style="min-width:160px; text-align:left; padding:10px 12px">
+              <strong>层 1：规则提取</strong><br>
+              <small>tag_source = "rules:title"<br>tag_source = "rules:detail"</small>
+            </div>
+            <div style="font-size:12px; color:#555; max-width:400px">
+              从 <code>source_title</code>、<code>caption</code>、<code>topics</code> 正则匹配预设关键词。<br>
+              detail 数据比 search 数据多 caption + topics，所以 detail 后打的标签更多。<br>
+              <span class="tag b">速度快</span> <span class="tag">不需要 API</span>
+            </div>
+          </div>
+          <div style="padding-left:20px;color:#aaa;font-size:12px">↓ 如果 tag_confidence &lt; 阈值 且 use_llm_tags=True</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="flow-step" style="min-width:160px; text-align:left; padding:10px 12px; border-color:#7c3aed; background:#f5f3ff">
+              <strong>层 2：Qwen 文本 LLM</strong><br>
+              <small>QwenTagEnricher<br>tag_source += "+llm:qwen-xxx"</small>
+            </div>
+            <div style="font-size:12px; color:#555; max-width:400px">
+              把 <code>source_title + caption</code> 批量发给 Qwen，让模型以 JSON 格式补全四类 tag。<br>
+              支持批处理（一次调用处理多条），节省 API 成本。<br>
+              <span class="tag y">需要 DASHSCOPE_API_KEY</span>
+            </div>
+          </div>
+          <div style="padding-left:20px;color:#aaa;font-size:12px">↓ 如果图片已下载 且 tag 仍然不足 且 use_llm_tags=True</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="flow-step" style="min-width:160px; text-align:left; padding:10px 12px; border-color:#c8a87a; background:#fdf8f0">
+              <strong>层 3：Qwen-VL 视觉 LLM</strong><br>
+              <small>VisionTagEnricher<br>tag_source += "+vision:qwen-vl"</small>
+            </div>
+            <div style="font-size:12px; color:#555; max-width:400px">
+              把下载好的图片 base64 编码发给 Qwen-VL 多模态模型，直接从图像推断款式/颜色。<br>
+              这一层在文字信息不足时（如无 caption 的图片帖）最有价值。<br>
+              <span class="tag y">需要 vision LLM API key</span> <span class="tag r">最慢，约 3-8s/张</span>
+            </div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:12px">
+          <strong>should_call_llm() 判断条件：</strong>当任一 tag 字段（style/color/material/scene）为空 AND tag_confidence &lt; 0.7 时触发 LLM 补全。避免对已有丰富标签的 detail 数据浪费 API。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">🧹 Tag 清洗规则</div>
+      <div class="card-body">
+        <p>所有来源的 tag 经过 <code>clean_tag()</code> 过滤：</p>
+        <ul>
+          <li>剥离 XHS 话题 markup：<code>[xxx]</code></li>
+          <li>去除"美甲"后缀/前缀（"猫眼美甲" → "猫眼"）</li>
+          <li>丢弃泛词：美甲、好看、显白、推荐、教程、爆款、种草、百搭 等 ~35 个</li>
+          <li>每字段上限：style ≤5、color ≤4、material ≤4、scene ≤4</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 5. Roboflow ═══ -->
+  <div class="section" id="roboflow">
+    <div class="section-title">⑤ Roboflow 集成：甲型检测</div>
+    <p class="section-sub">文件：<code>nails_agent/services/nail_extractor.py</code> + <code>nail_feature_extractor.py</code></p>
+
+    <div class="card">
+      <div class="card-head">🔍 调用流程</div>
+      <div class="card-body">
+        <div class="flow" style="flex-wrap:wrap">
+          <div class="flow-step">原始美甲图片</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step highlight">Roboflow REST API<br><small>fingernail-segmentation-yy1l7/3</small></div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">instance segmentation<br>多边形坐标</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">crop 单甲区域<br>透明背景 BGRA</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step ok">颜色提取<br>+ 甲型分类</div>
+        </div>
+        <pre style="margin-top:12px"># API 调用方式（直接 REST，不用 inference-sdk）
+POST https://detect.roboflow.com/fingernail-segmentation-yy1l7/3
+  ?api_key={ROBOFLOW_API_KEY}
+  body: base64 编码的图片
+  Content-Type: application/x-www-form-urlencoded</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📐 甲型分类：<code>classify_nail_length(crop)</code></div>
+      <div class="card-body">
+        <p>从 Roboflow 分割出的单甲 crop（RGBA 透明背景），取 alpha 通道 bbox 计算高宽比：</p>
+        <table>
+          <thead><tr><th>条件</th><th>甲型</th><th>输出</th></tr></thead>
+          <tbody>
+            <tr><td>h/w &gt; 1.8</td><td>长甲</td><td><code>nail_shape_tag = "长甲"</code></td></tr>
+            <tr><td>1.2 ≤ h/w ≤ 1.8</td><td>中甲</td><td><code>nail_shape_tag = "中甲"</code></td></tr>
+            <tr><td>h/w &lt; 1.2</td><td>短甲</td><td><code>nail_shape_tag = "短甲"</code></td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:10px">
+          <strong>优化（本次修复）：</strong>甲型分类和颜色提取共用同一个 Roboflow crop，不再二次调用 API。<code>extract_nail_visual_features()</code> 直接返回 <code>nail_shape_tag</code> 字段。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">🎨 颜色特征提取：<code>extract_nail_visual_features()</code></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>步骤</th><th>方法</th><th>输出字段</th></tr></thead>
+          <tbody>
+            <tr><td>像素采样</td><td>椭圆注意力 mask（偏向指甲板中央上部）+ 亮度/饱和度过滤</td><td>—</td></tr>
+            <tr><td>主色提取</td><td>OpenCV KMeans k=4，最多 12000 个采样点</td><td><code>dominant_palette</code></td></tr>
+            <tr><td>颜色分类</td><td>规则引擎（HSV + LAB + metallic hint）</td><td><code>primary_color_family</code>, <code>primary_color_name</code></td></tr>
+            <tr><td>颜色温度</td><td>Hue 范围规则</td><td><code>color_temperature</code>: warm/cool/neutral</td></tr>
+            <tr><td>亮度/饱和度</td><td>HSV V/S 分段</td><td><code>brightness_level</code>, <code>saturation_level</code></td></tr>
+            <tr><td>对比度</td><td>调色盘 L* 最大差</td><td><code>contrast_level</code>: high/medium/low</td></tr>
+            <tr><td>甲型</td><td>RGBA bbox 高宽比</td><td><code>nail_shape_tag</code>: 长甲/中甲/短甲</td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:10px">前提：<code>ROBOFLOW_API_KEY</code> 环境变量已设置。未设置时 fallback 全图提取（无 crop，但颜色精度下降）。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 6. 禁用 Mock ═══ -->
+  <div class="section" id="no-mock">
+    <div class="section-title">⑥ 开发规范：禁止使用 Mock 数据</div>
+    <p class="section-sub">所有开发、调试、测试均使用真实 XHS 数据</p>
+
+    <div class="card">
+      <div class="card-head">✅ 规范说明</div>
+      <div class="card-body">
+        <p><strong>Mock 文件的定位：</strong><code>web/data/</code> 中的 mock 文件（trend_signals.json、metric_snapshots.json 等）是 UI 的<strong>最终兜底</strong>（仅在 pipeline 完全没有产出时显示），<strong>不是开发时的数据来源</strong>。</p>
+        <p><strong>触发真实数据的完整流程：</strong></p>
+        <pre># 1. 确认 XHS-MCP Bridge 已运行
+curl http://localhost:18060/health                    # → {"ok":true}
+curl http://localhost:18060/api/v1/login/status       # → is_logged_in: true
+
+# 2. 运行 pipeline（真实模式）
+uv run python -m nails_agent.runner
+
+# 3. 输出写入
+# web/output/trend_signals.json
+# web/output/metric_snapshots.json
+# web/output/images/latest/raw/*.webp
+
+# 4. Streamlit UI 自动优先读 web/output/（data_loader.py）</pre>
+        <div class="note">如果 bridge 没有运行：<code>cd /path/to/project && node scripts/xhs_rest_bridge.mjs --port 18060</code></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">🔁 Mock fallback 触发条件（仅 UI 层）</div>
+      <div class="card-body">
+        <pre># web/data_loader.py
+def _load(filename):
+    out = OUTPUT_DIR / filename
+    seed = DATA_DIR / filename   # mock 文件
+    if out.exists():
+        data = parse(out)
+        if data:          # ← 非空才用 output
+            return data
+        # output 存在但为空 → fallback mock（pipeline 跑了但 0 结果）
+    return parse(seed)   # ← 只有这里会用 mock</pre>
+        <p>即：mock 数据只有在 <code>web/output/</code> 文件为空（pipeline 失败/0 信号）时才会显示。正常情况下永远是真实数据。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 7. 文件索引 ═══ -->
+  <div class="section" id="file-index">
+    <div class="section-title">⑦ 关键文件索引</div>
+    <p class="section-sub">按模块归类，附职责说明</p>
+
+    <div class="card">
+      <div class="card-head">📁 数据采集层</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>文件</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>nails_agent/tools/fetchers/signal_collector.py</code></td><td>统一入口，管理多数据源（CDP优先→MCP→Douyin→IG→Mock fallback）</td></tr>
+            <tr><td><code>nails_agent/tools/fetchers/xhs_mcp_fetcher.py</code></td><td>XHS 搜索+detail+9宫格切割+图片下载+tag规则提取</td></tr>
+            <tr><td><code>nails_agent/tools/fetchers/xhs_cdp_fetcher.py</code></td><td>真实 Chrome CDP 搜索（无限流风险）；需 port 9222</td></tr>
+            <tr><td><code>scripts/xhs_rest_bridge.mjs</code></td><td>Node.js HTTP Bridge，包装 @sillyl12324/xhs-mcp，暴露 REST 给 Python</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📁 Tag 打标层</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>文件</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>nails_agent/services/tag_enricher.py</code></td><td>QwenTagEnricher（文本LLM）+ VisionTagEnricher（Qwen-VL）</td></tr>
+            <tr><td><code>nails_agent/services/tag_rules.py</code></td><td>规则打标，从 title/caption/topics 正则提取 style/color/material/scene</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📁 视觉特征层</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>文件</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>nails_agent/services/nail_extractor.py</code></td><td>Roboflow instance segmentation，提取单甲 crop（BGRA）；<code>classify_nail_length()</code></td></tr>
+            <tr><td><code>nails_agent/services/nail_feature_extractor.py</code></td><td>KMeans 颜色分析，输出 primary_color_family / nail_shape_tag 等</td></tr>
+            <tr><td><code>nails_agent/services/style_store_ingestion.py</code></td><td>将 TrendSignal 写入 nail_styles_store，触发视觉特征提取</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📁 分析与输出层</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>文件</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td><code>nails_agent/agents/workers/trend_analyst.py</code></td><td>计算 composite_score，排序 Top10，生成 display_label，检测异常</td></tr>
+            <tr><td><code>nails_agent/agents/workers/value_evaluator.py</code></td><td>对候选样式进行商业价值评分</td></tr>
+            <tr><td><code>nails_agent/services/trend_presentation.py</code></td><td><code>generate_display_label()</code>：从 tags 生成语义化名称</td></tr>
+            <tr><td><code>web/data_loader.py</code></td><td>Streamlit 数据加载，output优先+空时fallback mock</td></tr>
+            <tr><td><code>web/output/</code></td><td>真实 pipeline 输出目录（trend_signals.json / metric_snapshots.json / images/）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">📁 数据库</div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>表</th><th>位置</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>nail_styles_store</code></td><td><code>~/.nails_agent/memory.db</code></td><td>真实抓取后写入的样式数据（0行=pipeline未成功写入）</td></tr>
+            <tr><td><code>nail_visual_features</code></td><td>同上</td><td>视觉特征（颜色、甲型等），15行seed数据</td></tr>
+            <tr><td><code>pipeline_runs</code></td><td>同上</td><td>每次 pipeline 执行记录</td></tr>
+          </tbody>
+        </table>
+        <pre>sqlite3 ~/.nails_agent/memory.db \
+  "SELECT count(*) FROM nail_styles_store; SELECT count(*) FROM nail_visual_features;"</pre>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /layout -->
+
+<script>
+// Active nav on scroll
+const sections = document.querySelectorAll('.section');
+const navItems = document.querySelectorAll('.nav-item');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navItems.forEach(n => n.classList.remove('active'));
+      const match = document.querySelector(`.nav-item[href="#${e.target.id}"]`);
+      if (match) match.classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

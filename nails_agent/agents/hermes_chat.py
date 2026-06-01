@@ -72,7 +72,7 @@ class HermesNailsAgent:
                 )
                 return result.final_output
 
-            output = asyncio.get_event_loop().run_until_complete(_run())
+            output = asyncio.run(_run())
             return str(output) if output else "（无响应）"
         except Exception as exc:
             logger.exception("Orchestrator error: %s", exc)
@@ -120,34 +120,51 @@ class HermesNailsAgent:
             from nails_agent.agents.nail_agents import get_orchestrator_agent
 
             agent = get_orchestrator_agent()
-            async with Runner.run_streamed(agent, message, max_turns=30) as stream:
-                async for event in stream.stream_events():
-                    if hasattr(event, "type"):
-                        if event.type == "run_item_stream_event":
-                            item = event.item
-                            if hasattr(item, "raw_item"):
-                                ri = item.raw_item
-                                # Tool call
-                                name = getattr(ri, "name", "")
-                                if name:
-                                    yield ("tool", f"🔧 {name}(…)")
-                        elif event.type == "raw_responses_stream_event":
-                            delta = getattr(event.data, "delta", None)
-                            if delta and hasattr(delta, "content"):
-                                for c in delta.content:
-                                    if hasattr(c, "text"):
-                                        yield ("text", c.text)
+            stream = Runner.run_streamed(agent, message, max_turns=30)
+            async for event in stream.stream_events():
+                if hasattr(event, "type"):
+                    if event.type == "run_item_stream_event":
+                        item = event.item
+                        if hasattr(item, "raw_item"):
+                            ri = item.raw_item
+                            # Tool call
+                            name = getattr(ri, "name", "")
+                            if name:
+                                yield ("tool", f"🔧 {name}(…)")
+                    elif event.type == "raw_responses_stream_event":
+                        delta = getattr(event.data, "delta", None)
+                        if delta and hasattr(delta, "content"):
+                            for c in delta.content:
+                                if hasattr(c, "text"):
+                                    yield ("text", c.text)
             yield ("done", str(stream.final_output or ""))
 
-        # Drive the async generator synchronously
-        loop = asyncio.get_event_loop()
-        agen = _astream()
-        try:
-            while True:
-                item = loop.run_until_complete(agen.__anext__())
-                yield item
-        except StopAsyncIteration:
-            pass
+        # Drive the async generator synchronously via a background thread + queue.
+        # asyncio.get_event_loop() fails in Streamlit threads; asyncio.run() can't
+        # be used with an async generator. Running the whole async loop in a
+        # dedicated thread avoids the "no current event loop" error.
+        import queue
+        import threading
+
+        _SENTINEL = object()
+        q: queue.Queue = queue.Queue()
+
+        async def _collect() -> None:
+            async for item in _astream():
+                q.put(item)
+            q.put(_SENTINEL)
+
+        def _run_thread() -> None:
+            asyncio.run(_collect())
+
+        t = threading.Thread(target=_run_thread, daemon=True)
+        t.start()
+        while True:
+            item = q.get()
+            if item is _SENTINEL:
+                break
+            yield item
+        t.join(timeout=5)
 
     def reset(self) -> None:
         self._history = []

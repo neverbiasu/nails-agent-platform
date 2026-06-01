@@ -360,6 +360,7 @@ class NailStyleStoreItem(BaseModel):
     color_tags: List[str] = []
     material_tags: List[str] = []
     scene_tags: List[str] = []
+    shape_tags: List[str] = []
     is_trend_generated: bool = False
     status: str = "listed"  # candidate | enhanced | listed | archived
 

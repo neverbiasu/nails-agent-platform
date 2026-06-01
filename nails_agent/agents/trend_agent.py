@@ -62,9 +62,9 @@ def run_trend_scout(
             progress_cb("🤖 TrendScoutAgent 启动 (Qwen3)…")
 
         # Run synchronously; stream events for progress (result written to disk)
-        asyncio.get_event_loop().run_until_complete(
-            _run_with_progress(agent, user_msg, progress_cb, max_turns)
-        )
+        # Use asyncio.run() so this works in threads that have no running event loop
+        # (e.g. Streamlit's ScriptRunner.scriptThread).
+        asyncio.run(_run_with_progress(agent, user_msg, progress_cb, max_turns))
 
     except Exception as exc:
         logger.exception("TrendScoutAgent failed: %s", exc)
@@ -77,24 +77,9 @@ def run_trend_scout(
 
 
 async def _run_with_progress(agent, user_msg: str, progress_cb, max_turns: int):
-    from agents import Runner
+    from nails_agent.agents.agent_config import run_streamed_with_fallback
 
-    async with Runner.run_streamed(agent, user_msg, max_turns=max_turns) as stream:
-        async for event in stream.stream_events():
-            if hasattr(event, "type"):
-                if event.type == "agent_updated_stream_event":
-                    if progress_cb:
-                        progress_cb(f"🔄 {event.new_agent.name} 接管")
-                elif event.type == "run_item_stream_event":
-                    item = event.item
-                    # Tool call progress
-                    if hasattr(item, "type") and item.type == "tool_call_item":
-                        if progress_cb and hasattr(item, "raw_item"):
-                            ri = item.raw_item
-                            name = getattr(ri, "name", "") if hasattr(ri, "name") else ""
-                            if name:
-                                progress_cb(f"🔧 {name}(…)")
-    return stream.final_output
+    return await run_streamed_with_fallback(agent, user_msg, progress_cb, max_turns)
 
 
 def _load_trend_result(output_dir: str, progress_cb) -> "TrendAnalysisResult":
@@ -129,11 +114,28 @@ def _load_trend_result(output_dir: str, progress_cb) -> "TrendAnalysisResult":
         except Exception:
             pass
 
+    # Load original raw signals to restore fields that the LLM may have dropped
+    # (e.g. display_label, source_title, local_image_paths).
+    raw_signals_path = os.path.join(output_dir, "trend_signals.json")
+    raw_signal_map: dict = {}
+    try:
+        with open(raw_signals_path, encoding="utf-8") as _f:
+            for sig in json.load(_f):
+                tid = sig.get("trend_id") or sig.get("source_note_id")
+                if tid:
+                    raw_signal_map[tid] = sig
+    except Exception:
+        pass
+
     top_10: List[TrendSignal] = []
     for raw in data.get("top_10", [])[:10]:
         try:
+            # Merge: original signal data is the base, LLM output overrides where present
+            tid = raw.get("trend_id") or raw.get("source_note_id")
+            base = dict(raw_signal_map.get(tid or "", {}))
+            base.update({k: v for k, v in raw.items() if v not in (None, "", [], {})})
             top_10.append(
-                TrendSignal(**{k: raw.get(k, "") for k in TrendSignal.model_fields if k in raw})
+                TrendSignal(**{k: base.get(k, "") for k in TrendSignal.model_fields if k in base})
             )
         except Exception:
             pass

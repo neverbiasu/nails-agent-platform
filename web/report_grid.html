@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>9宫格切割 + 本次改动</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f4f0; color: #1a1a1a; padding: 40px 48px; }
+h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.sub { color: #888; font-size: 13px; margin-bottom: 32px; }
+.section { margin-bottom: 40px; }
+.section-title { font-size: 15px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid #ece9e3; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.card { background: #fff; border: 1px solid #ece9e3; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.card-head { background: #faf9f7; padding: 12px 20px; border-bottom: 1px solid #ece9e3; font-size: 13px; font-weight: 700; }
+.card-body { padding: 16px 20px; font-size: 13.5px; }
+.grid-demo { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin-top: 8px; }
+.grid-box { text-align: center; }
+.grid-box img { border-radius: 8px; border: 1px solid #ece9e3; display: block; }
+.grid-box .label { font-size: 11px; color: #888; margin-top: 6px; }
+.grid-box .label.best { color: #166534; font-weight: 700; }
+.arrow { font-size: 28px; color: #aaa; align-self: center; }
+.tag { display: inline-block; background: #f0ede8; color: #555; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin: 1px; }
+.tag.g { background: #dcfce7; color: #166534; }
+.tag.b { background: #dbeafe; color: #1e40af; }
+.tag.y { background: #fef9c3; color: #854d0e; }
+.tag.r { background: #fee2e2; color: #991b1b; }
+code { background: #f0ede8; color: #7c3aed; font-size: 12px; padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, monospace; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 8px 14px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #888; background: #faf9f7; border-bottom: 1px solid #ece9e3; }
+td { padding: 10px 14px; border-bottom: 1px solid #f0ede8; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.diff-old { color: #dc2626; text-decoration: line-through; opacity: .7; }
+.diff-new { color: #16a34a; font-weight: 600; }
+pre { background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 14px; font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; line-height: 1.5; overflow-x: auto; margin: 8px 0; }
+.note { background: #f0f4ff; border-left: 3px solid #6366f1; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h1>9宫格切割 + 本次三项改动</h1>
+<p class="sub">2026-05-28 · nails-agent-platform</p>
+
+<!-- ── 9宫格 DEMO ── -->
+<div class="section">
+  <div class="section-title">🔪 9宫格切割：实测演示</div>
+  <div class="card">
+    <div class="card-head">TREND_20260528_XHS_F9DD9B_1.webp — 1080×1080 → 检测为 grid9 → 切割</div>
+    <div class="card-body">
+      <div class="grid-demo">
+        <div class="grid-box">
+          <img src="images/latest/raw/TREND_20260528_XHS_F9DD9B_1.webp" width="180" height="180"/>
+          <div class="label">原始合集封面<br>1080×1080 ratio=1.00</div>
+        </div>
+        <span class="arrow">→</span>
+        <div class="grid-box">
+          <img src="images/latest/raw/DEMO_GRID9_cell2_0.webp" width="120" height="120" style="border:2px solid #22c55e"/>
+          <div class="label best">✅ 最清晰 cell<br>cell(2,0) 360×360</div>
+        </div>
+        <div class="grid-box">
+          <img src="images/latest/raw/DEMO_GRID9_cell0_2.webp" width="120" height="120"/>
+          <div class="label">备选 cell<br>cell(0,2) 360×360</div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:12px">
+        <strong>为什么平时没触发？</strong><br>
+        XHS 搜索 API 返回的封面图是 640×853（0.75 竖图），不满足近正方形条件（0.85–1.18 ratio），所以普通搜索结果都是 <code>normal</code>。<br>
+        9宫格封面（如 F9DD9B 的 1080×1080 合集封面）在用户主动制作"合集封面"时才出现，关键词 <code>春季美甲合集</code>、<code>美甲款式合集</code> 能提升命中率。本次已加入关键词池。
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">检测算法（三层过滤）</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>条件</th><th>判断</th></tr></thead>
+        <tbody>
+          <tr><td>宽高比 &lt; 0.4 或 &gt; 2.5</td><td>→ <code>wide_strip</code>（丢弃）</td></tr>
+          <tr><td>宽或高 &lt; 600px</td><td>→ <code>normal</code>（太小）</td></tr>
+          <tr><td>ratio 不在 0.85–1.18</td><td>→ <code>normal</code>（非正方形）</td></tr>
+          <tr><td>列均值曲线 ≥2 个谷 AND 行均值曲线 ≥2 个谷</td><td>→ <code>grid9</code> ✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 三项改动 ── -->
+<div class="section">
+  <div class="section-title">⚙ 本次三项改动</div>
+
+  <div class="card">
+    <div class="card-head">① 关键词 + 候选量扩大 → 稳定 Top 10</div>
+    <div class="card-body">
+      <table>
+        <thead><tr><th>参数</th><th>之前</th><th>现在</th><th>效果</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>_PER_KW_LIMIT</code></td>
+            <td><span class="diff-old">10</span></td>
+            <td><span class="diff-new">20</span></td>
+            <td>每个关键词取 20 条 feed，候选池翻倍</td>
+          </tr>
+          <tr>
+            <td><code>xhs_detail_candidate_n</code></td>
+            <td><span class="diff-old">15</span></td>
+            <td><span class="diff-new">20</span></td>
+            <td>最多发 20 个 detail 请求，有足够余量填满 Top 10</td>
+          </tr>
+          <tr>
+            <td><code>xhs_max_images_per_signal</code></td>
+            <td><span class="diff-old">1</span></td>
+            <td><span class="diff-new">3</span></td>
+            <td>每条信号下载前 3 张图，提升 9宫格命中率 + 选最清晰</td>
+          </tr>
+          <tr>
+            <td>关键词维度</td>
+            <td><span class="diff-old">5维 7词</span></td>
+            <td><span class="diff-new">6维 9词（加"合集"维）</span></td>
+            <td>9词×20条 = 180候选（去重后~145）→ 本次实测已抓到 10/10</td>
+          </tr>
+        </tbody>
+      </table>
+      <pre style="margin-top:10px">实测日志：
+XHS-MCP: '春季美甲合集' → 20 signals   ← 新增合集维关键词
+XHS-MCP: selected 10 detail-enriched signals from top 20/145 candidates
+Collected: 10 signals  ← Top 10 达成</pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">② "Note not found" 不再浪费重试次数</div>
+    <div class="card-body">
+      <p>之前：每个 "Note not found" 会消耗 2 次重试（30s timeout × 2 = 60s 浪费）。</p>
+      <p>现在：检测到 <code>not found</code> 或 <code>xsectoken</code> 错误消息，立即 <code>break</code> 跳到下一候选。</p>
+      <pre>if "not found" in msg.lower() or "xsectoken" in msg.lower():
+    break   # ← 不再 continue retry</pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">③ 多图信号自动选最清晰一张</div>
+    <div class="card-body">
+      <p>下载 3 张图后，用 Laplacian 方差对所有图排序，<code>local_image_paths[0]</code> 始终是最清晰的。</p>
+      <pre>local_paths.sort(key=_sharpness, reverse=True)  # 最清晰排第一</pre>
+      <p>这样即使 9 张图帖子只下了前 3 张，颜色提取和视觉特征提取也用到最好的一张。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Go server ── -->
+<div class="section">
+  <div class="section-title">❓ Go 服务器为什么没用起来</div>
+  <div class="card">
+    <div class="card-body">
+      <table>
+        <thead><tr><th>方案</th><th>原理</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Go xpzouying/xiaohongshu-mcp</strong></td>
+            <td>go-rod + channel:chrome（真实 Chrome），持久化 cookies.json，不被 XHS 识别</td>
+            <td><span class="tag r">源码在 /tmp 已丢失，二进制在 Go build cache，未安装到 PATH</span></td>
+          </tr>
+          <tr>
+            <td><strong>Node @sillyl12324/xhs-mcp + Bridge</strong></td>
+            <td>Playwright Chromium headless，通过 xhs_rest_bridge.mjs 暴露 REST</td>
+            <td><span class="tag g">当前运行中（port 18060）</span></td>
+          </tr>
+          <tr>
+            <td><strong>XHSCDPFetcher</strong></td>
+            <td>Python Playwright 连接真实 Chrome CDP，最优方案</td>
+            <td><span class="tag y">代码就绪，需要 open -a Chrome --args --remote-debugging-port=9222</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:12px">
+        <strong>建议：</strong>Go 方案值得恢复。<br>
+        <code>git clone https://github.com/xpzouying/xiaohongshu-mcp && cd xiaohongshu-mcp && go build -o ~/go/bin/xiaohongshu-mcp .</code><br>
+        然后把 <code>xhs_rest_bridge.mjs</code> 替换为直接调用 Go 二进制（或 Go 服务已有相同 REST API，切换 port 即可）。
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

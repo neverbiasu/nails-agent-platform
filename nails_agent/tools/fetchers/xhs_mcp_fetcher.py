@@ -27,6 +27,7 @@ import requests
 from nails_agent.models.schemas import RejectedTrendCandidate, TrendSignal
 from nails_agent.services.tag_enricher import (
     QwenTagEnricher,
+    VisionTagEnricher,
     apply_tags,
     clean_tag_dict,
     merge_tag_dict,
@@ -363,6 +364,13 @@ def _merge_detail_to_signal(
     )
 
 
+# Minimum full-width seam-discontinuity (relative to median) required at *both*
+# the 1/3 and 2/3 boundaries, in *both* axes, to call an image a 3×3 composite.
+# Tuned on real XHS data: genuine nail grids score ≈13–15×, while single photos,
+# posters and infographics stay ≤≈3.4×, so 4.0 sits in a wide, safe gap.
+GRID_SEAM_RATIO = 4.0
+
+
 class XHSMCPFetcher:
     """
     Fetches XHS data via the local Go xiaohongshu-mcp HTTP server.
@@ -380,6 +388,14 @@ class XHSMCPFetcher:
         self._session = requests.Session()
         # Local MCP traffic should not be routed through HTTP_PROXY/ALL_PROXY.
         self._session.trust_env = False
+        # Pace per-keyword searches: each one drives a headless-browser scrape on
+        # XHS; firing many back-to-back trips XHS rate-limiting (search returns
+        # empty / waitForFunction timeout). Sleep a jittered delay between
+        # keywords to look human. Tunable via env; set 0 to disable.
+        import os
+
+        self._search_delay_min = float(os.environ.get("NAILS_XHS_SEARCH_DELAY_MIN", "3"))
+        self._search_delay_max = float(os.environ.get("NAILS_XHS_SEARCH_DELAY_MAX", "7"))
 
     def _candidate_base_urls(self) -> List[str]:
         parsed = urlparse(self.base_url)
@@ -447,7 +463,18 @@ class XHSMCPFetcher:
         if isinstance(keywords, str):
             keywords = [keywords]
         candidates: List[Tuple[TrendSignal, dict, str]] = []
-        for kw in keywords:
+        for i, kw in enumerate(keywords):
+            # Throttle between keywords to avoid tripping XHS rate-limiting.
+            if i > 0 and self._search_delay_max > 0:
+                import random
+                import time
+
+                delay = random.uniform(
+                    min(self._search_delay_min, self._search_delay_max),
+                    self._search_delay_max,
+                )
+                logger.debug("XHS-MCP: throttle %.1fs before '%s'", delay, kw)
+                time.sleep(delay)
             try:
                 logger.info("XHS-MCP: searching '%s'…", kw)
                 r = self._session.get(
@@ -496,6 +523,7 @@ class XHSMCPFetcher:
 
         signals: List[TrendSignal] = []
         tag_enricher = QwenTagEnricher() if use_llm_tags else None
+        vision_enricher = VisionTagEnricher() if use_llm_tags else None
 
         if not enrich_detail:
             for sig, _feed, _kw in selected:
@@ -506,6 +534,20 @@ class XHSMCPFetcher:
                         image_dir=image_dir,
                         max_images=max_images_per_signal,
                     )
+                    # Vision VL fallback: fill missing tags from the downloaded image
+                    if use_llm_tags and vision_enricher and vision_enricher.available:
+                        first_img = (enriched.local_image_paths or [None])[0]
+                        if first_img and should_call_llm(
+                            signal_tag_dict(enriched), enriched.tag_confidence
+                        ):
+                            vision_tags = vision_enricher.extract_from_image(first_img)
+                            if any(vision_tags.values()):
+                                merged = merge_tag_dict(signal_tag_dict(enriched), vision_tags)
+                                enriched = apply_tags(
+                                    enriched,
+                                    merged,
+                                    f"{enriched.tag_source}+vision:{vision_enricher.model}",
+                                )
                 signals.append(enriched)
             return signals
 
@@ -522,20 +564,31 @@ class XHSMCPFetcher:
                     max_attempts=detail_retry_attempts,
                 )
                 if not detail:
+                    # Detail call failed (transient / HTTP / bot-challenge). Keep the
+                    # shallow search signal — it still carries a cover image and
+                    # title-derived tags, so a flaky detail does not collapse the
+                    # Top-N. It stays detail_enriched=False; the Step-4 check below
+                    # skips (without recording) any shallow signal that still lacks
+                    # usable tags, letting the backfill loop replace it.
                     logger.info(
-                        "XHS-MCP detail skipped after retries: feed_id=%s keyword=%s",
+                        "XHS-MCP detail failed — keeping shallow signal: feed_id=%s keyword=%s",
                         feed.get("id") or sig.source_note_id,
                         kw,
                     )
+                    enriched = apply_tags(
+                        sig, signal_tag_dict(sig), sig.tag_source or "rules:title"
+                    )
+                    detailed.append(enriched)
                     continue
                 enriched = _merge_detail_to_signal(sig, detail, feed, kw)
                 if not enriched.detail_enriched:
+                    # Detail returned but could not be parsed into a richer signal.
+                    # Keep the shallow signal (same rationale as a failed detail).
                     logger.info(
-                        "XHS-MCP detail parse skipped: feed_id=%s keyword=%s",
+                        "XHS-MCP detail parse failed — keeping shallow signal: feed_id=%s keyword=%s",
                         feed.get("id") or sig.source_note_id,
                         kw,
                     )
-                    continue
                 enriched = apply_tags(
                     enriched,
                     signal_tag_dict(enriched),
@@ -555,6 +608,8 @@ class XHSMCPFetcher:
 
             for enriched in detailed:
                 key = enriched.source_note_id or enriched.trend_id
+
+                # Step 1: merge text-LLM tags
                 llm_tags = batch_tags.get(key, {})
                 if llm_tags:
                     merged = merge_tag_dict(signal_tag_dict(enriched), llm_tags)
@@ -564,23 +619,57 @@ class XHSMCPFetcher:
                         else enriched.tag_source
                     )
                     enriched = apply_tags(enriched, merged, source)
-                reason = rejection_reason(signal_tag_dict(enriched))
-                if reason:
-                    reason_code, reason_text = reason
-                    self.rejected_candidates.append(
-                        self._rejected_candidate(
-                            enriched,
-                            reason_code=reason_code,
-                            reason_text=reason_text,
-                        )
-                    )
-                    continue
+
+                # Step 2: download image first so vision enrichment can run before rejection
                 if download_images:
                     enriched = self._download_signal_images(
                         enriched,
                         image_dir=image_dir,
                         max_images=max_images_per_signal,
                     )
+
+                # Step 3: vision enrichment — fill missing tags from the image
+                if (
+                    use_llm_tags
+                    and vision_enricher
+                    and vision_enricher.available
+                    and should_call_llm(signal_tag_dict(enriched), enriched.tag_confidence)
+                ):
+                    first_img = (enriched.local_image_paths or [None])[0]
+                    if first_img:
+                        vision_tags = vision_enricher.extract_from_image(first_img)
+                        if any(vision_tags.values()):
+                            merged = merge_tag_dict(signal_tag_dict(enriched), vision_tags)
+                            enriched = apply_tags(
+                                enriched,
+                                merged,
+                                f"{enriched.tag_source}+vision:{vision_enricher.model}",
+                            )
+
+                # Step 4: weak-tag handling.
+                reason = rejection_reason(signal_tag_dict(enriched))
+                if reason:
+                    reason_code, reason_text = reason
+                    if not enriched.detail_enriched:
+                        # Shallow signal (detail failed) that still lacks usable
+                        # tags is an infra failure — skip it so the backfill loop
+                        # can replace it with a candidate whose detail succeeds.
+                        logger.info(
+                            "XHS-MCP shallow signal lacked tags — skipping for backfill: %s",
+                            enriched.source_note_id or enriched.trend_id,
+                        )
+                        continue
+                    # Fully detail-enriched but below the tag floor: KEEP it. This
+                    # is what collapsed the Top-N to a single post — nearly every
+                    # enriched candidate fell below the 2-tag floor and was dropped,
+                    # leaving nothing to fill the grid. We keep it and recover tag
+                    # quality later via VLM, rather than discarding a valid post.
+                    logger.info(
+                        "XHS-MCP enriched signal below tag floor (%s) — keeping: %s",
+                        reason_code,
+                        enriched.source_note_id or enriched.trend_id,
+                    )
+
                 signals.append(enriched)
                 accepted += 1
                 if len(signals) >= detail_top_n:
@@ -671,13 +760,17 @@ class XHSMCPFetcher:
                     continue
                 body = r.json()
                 if body.get("success") is False:
+                    msg = body.get("message") or ""
                     logger.warning(
                         "XHS-MCP detail '%s' failed (attempt %d/%d): %s",
                         feed_id,
                         attempt,
                         attempts,
-                        body.get("message"),
+                        msg,
                     )
+                    # "Note not found" / token mismatch — retrying won't help, skip immediately
+                    if "not found" in msg.lower() or "xsectoken" in msg.lower():
+                        break
                     continue
                 return body
             except requests.Timeout:
@@ -710,6 +803,124 @@ class XHSMCPFetcher:
             seen.add(key)
             deduped.append((sig, feed, kw))
         return deduped
+
+    # ── Grid detection & splitting ────────────────────────────────────────────
+
+    @staticmethod
+    def _classify_image(path: Path) -> str:
+        """Return 'grid9' | 'wide_strip' | 'normal' for a downloaded image.
+
+        XHS 9-grid composites are posted as a single roughly-square image that
+        contains 3×3 individual nail photos.  They share the same aspect ratio
+        as normal single-photo images (0.6–1.4) so we cannot detect them by
+        ratio alone.  Instead we use a combination of:
+          1. Minimum size heuristic (must be large enough to contain 9 cells)
+          2. Near-square aspect ratio  (0.85 – 1.18)
+          3. Evidence of a regular grid: horizontal and vertical separator lines
+             detected via variance drop in averaged row/column profiles.
+
+        Wide strips (w/h > 2.5 or h/w > 2.5) are kept as a separate category
+        but are also discarded — they were the only class the old code handled.
+        """
+        try:
+            from PIL import Image
+            import numpy as np
+
+            with Image.open(path) as img:
+                w, h = img.size
+
+            if w == 0 or h == 0:
+                return "normal"
+
+            ratio = w / h
+            # Wide horizontal / tall vertical strips — not usable
+            if ratio > 2.5 or ratio < 0.4:
+                return "wide_strip"
+
+            # A 3×3 composite needs enough pixels for 9 usable cells.
+            if w < 600 or h < 600:
+                return "normal"
+
+            # Detect a 3×3 composite by its seam signature: a real grid has a
+            # sharp, full-width discontinuity at *exactly* the 1/3 and 2/3
+            # boundaries in BOTH axes, because adjacent cells are independent
+            # photos. We measure the full-width mean adjacent-pixel difference at
+            # each third against the image's median difference. A single photo has
+            # no special discontinuity at thirds; posters/infographics spike at
+            # most one boundary. Requiring all four seams (both rows + both
+            # columns) to spike rejects them.  Aspect ratio is NOT used to gate —
+            # XHS grids are 3:4 portrait, identical to single photos, so the seam
+            # signature is the only reliable discriminator.
+            with Image.open(path) as img:
+                gray = np.asarray(img.convert("L"), dtype=np.float32)
+
+            row_diff = np.abs(np.diff(gray, axis=0)).mean(axis=1)  # per row-boundary
+            col_diff = np.abs(np.diff(gray, axis=1)).mean(axis=0)  # per col-boundary
+
+            def _seam_spike(profile: np.ndarray, frac: float) -> float:
+                """Peak full-width discontinuity near `frac` vs median baseline."""
+                idx = int(round(len(profile) * frac))
+                win = max(1, len(profile) // 200)
+                local = float(profile[max(0, idx - win) : idx + win + 1].max())
+                baseline = float(np.median(profile)) + 1e-6
+                return local / baseline
+
+            h_seam = min(_seam_spike(row_diff, 1 / 3), _seam_spike(row_diff, 2 / 3))
+            v_seam = min(_seam_spike(col_diff, 1 / 3), _seam_spike(col_diff, 2 / 3))
+            if h_seam >= GRID_SEAM_RATIO and v_seam >= GRID_SEAM_RATIO:
+                return "grid9"
+            return "normal"
+
+        except Exception:
+            return "normal"
+
+    @staticmethod
+    def _split_grid9(path: Path, out_dir: Path, stem: str) -> List[Path]:
+        """Split a 9-grid image into 9 cells and return paths of the best ones.
+
+        Scoring per cell: sharpness (Laplacian variance) weighted by size.
+        Returns up to 2 best cells (avoiding near-duplicate top picks).
+        """
+        try:
+            from PIL import Image
+            import numpy as np
+
+            with Image.open(path) as img:
+                w, h = img.size
+                cw, ch = w // 3, h // 3
+                cells: List[tuple] = []  # (score, path)
+                for row in range(3):
+                    for col in range(3):
+                        box = (col * cw, row * ch, (col + 1) * cw, (row + 1) * ch)
+                        cell = img.crop(box)
+                        cell_path = out_dir / f"{stem}_cell{row}_{col}.webp"
+                        cell.save(cell_path, "WEBP", quality=88)
+
+                        # Sharpness proxy: variance of row/column gradients
+                        # (higher = sharper, more in-focus nail detail).
+                        gray = np.array(cell.convert("L"), dtype=np.float32)
+                        sharpness = float(
+                            np.var(np.diff(gray, axis=0)) + np.var(np.diff(gray, axis=1))
+                        )
+                        cells.append((sharpness, cell_path))
+
+                cells.sort(key=lambda x: x[0], reverse=True)
+                # Return top 2, but skip pairs that are row/col-adjacent (too similar)
+                chosen: List[Path] = []
+                chosen_paths: List[Path] = []
+                for score, cp in cells:
+                    if len(chosen) >= 2:
+                        break
+                    chosen.append(score)
+                    chosen_paths.append(cp)
+                # Clean up unchosen cells
+                for _, cp in cells:
+                    if cp not in chosen_paths:
+                        cp.unlink(missing_ok=True)
+                return chosen_paths
+        except Exception as exc:
+            logger.debug("Grid split failed for %s: %s", path.name, exc)
+            return []
 
     def _download_signal_images(
         self,
@@ -744,9 +955,53 @@ class XHSMCPFetcher:
                     suffix = ".jpg"
                 path = out_dir / f"{signal.trend_id}_{idx}{suffix}"
                 path.write_bytes(r.content)
+
+                kind = self._classify_image(path)
+                if kind == "wide_strip":
+                    logger.info("Discarding wide-strip image: %s", path.name)
+                    path.unlink(missing_ok=True)
+                    continue
+                if kind == "grid9":
+                    # A 3×3 composite: crop out the best single-nail cell. We do
+                    # NOT detour to sibling URLs — in practice those are poster /
+                    # cover art (text overlays, props), so a clean cell from the
+                    # grid is the best single nail we can surface for this signal.
+                    logger.info(
+                        "9-grid composite — splitting 3×3, picking best cell: %s", path.name
+                    )
+                    stem = f"{signal.trend_id}_{idx}"
+                    cells = self._split_grid9(path, out_dir, stem)
+                    path.unlink(missing_ok=True)
+                    if cells:
+                        local_paths.append(str(cells[0]))
+                        logger.info("Grid split → best cell: %s", cells[0].name)
+                        # The cover composite gave us a clean nail crop — that's our
+                        # representative image; stop before pulling poster siblings.
+                        if idx == 1:
+                            break
+                    else:
+                        logger.warning("Grid split produced no cells for %s", path.name)
+                    continue
                 local_paths.append(str(path))
             except Exception as exc:
                 logger.debug("XHS image download failed for %s: %s", url, exc)
+
+        # Pick the sharpest image from all downloaded paths as the primary
+        # (important when max_images > 1: e.g. a 9-photo post's best shot).
+        if len(local_paths) > 1:
+            try:
+                import numpy as np
+                from PIL import Image as _PILImage
+
+                def _sharpness(p: str) -> float:
+                    with _PILImage.open(p) as _img:
+                        gray = np.array(_img.convert("L"), dtype=np.float32)
+                    return float(np.var(np.diff(gray, axis=0)) + np.var(np.diff(gray, axis=1)))
+
+                local_paths.sort(key=_sharpness, reverse=True)
+                logger.debug("Multi-image sharpness sort → best: %s", Path(local_paths[0]).name)
+            except Exception:
+                pass
 
         return signal.model_copy(
             update={

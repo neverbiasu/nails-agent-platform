@@ -157,6 +157,22 @@ def login_and_save(name: str, max_wait_s: int = 300) -> None:
             print(f"✅ Created '{name}' in xhs-mcp DB")
         conn.commit()
         conn.close()
+
+        # Notify the REST bridge to evict its cached XhsClient so the next
+        # search loads fresh cookies from DB — no bridge restart needed.
+        bridge_url = "http://localhost:18060/api/v1/accounts/reload"
+        try:
+            import urllib.request
+
+            urllib.request.urlopen(
+                urllib.request.Request(bridge_url, method="POST", data=b""),
+                timeout=5,
+            )
+            print("✅ Bridge account pool reloaded — new cookies active immediately.")
+        except Exception as e:
+            print(f"⚠️  Could not reach bridge at {bridge_url}: {e}")
+            print("   If the bridge is running, restart it manually to apply new cookies.")
+
         print("\nDone. Try `xhs_check_auth_status` next.")
 
 

@@ -318,10 +318,48 @@ def extract_nail_visual_features(
     image_path: str | Path,
     style_id: str,
     visual_feature_id: str | None = None,
+    *,
+    use_nail_crop: bool = True,
 ) -> dict[str, Any]:
-    """Extract a NailVisualFeature dict from an enhanced nail image."""
+    """Extract a NailVisualFeature dict from an enhanced nail image.
+
+    When *use_nail_crop* is ``True`` (default) and a ``ROBOFLOW_API_KEY`` is
+    configured, the image is first passed through Roboflow instance
+    segmentation to isolate individual nail regions.  The largest detected
+    nail crop is then used for color analysis, which dramatically improves
+    accuracy compared to whole-image extraction.
+
+    Falls back to whole-image analysis silently when nail cropping is
+    unavailable or detects nothing.
+    """
     _require_cv2()
-    rgb = load_rgb_image(image_path)
+
+    effective_path: str | Path = image_path
+    nail_crop_used = False
+    nail_shape_tag: str = ""  # 长甲 / 中甲 / 短甲, empty if crop failed
+    if use_nail_crop:
+        try:
+            from nails_agent.services.nail_extractor import (
+                classify_nail_length,
+                extract_nail_crops,
+            )
+
+            crops = extract_nail_crops(image_path)
+            if crops:
+                effective_path = crops[0]
+                nail_crop_used = True
+                # Compute length classification from the same crop — no extra API call
+                nail_shape_tag = classify_nail_length(crops[0])
+        except ImportError:
+            pass  # inference-sdk not installed — fall back to whole image
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "Nail crop failed for %s, falling back to whole image", image_path, exc_info=True
+            )
+
+    rgb = load_rgb_image(effective_path)
     pixels = _sample_pixels(rgb)
     palette = _dominant_colors(pixels)
 
@@ -367,7 +405,9 @@ def extract_nail_visual_features(
         "extractor_version": EXTRACTOR_VERSION,
         "feature_confidence": confidence,
         "needs_manual_review": confidence < 0.62 or primary["color_family"] == "unknown",
-        "feature_source": "auto_color_extract",
+        "feature_source": "nail_crop_extract" if nail_crop_used else "auto_color_extract",
+        "nail_crop_used": nail_crop_used,
+        "nail_shape_tag": nail_shape_tag,
         "created_at": now,
         "updated_at": None,
     }

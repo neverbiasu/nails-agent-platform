@@ -21,7 +21,12 @@ from nails_agent.models.schemas import (
     ValueEvaluationResult,
     NailStyleStoreItem,
 )
-from nails_agent.services.trend_presentation import sample_label, signal_image_url, tag_summary
+from nails_agent.services.trend_presentation import (
+    generate_display_label,
+    sample_label,
+    signal_image_url,
+    tag_summary,
+)
 
 
 _TZ8 = timezone(timedelta(hours=8))
@@ -191,7 +196,9 @@ def evaluate(
             MetricSnapshot(
                 trend_id=sig.trend_id,
                 keyword=sig.keyword,
-                display_label=sample_label(sig, sig.rank, with_tags=False),
+                display_label=generate_display_label(sig)
+                or sig.display_label
+                or sample_label(sig, sig.rank, with_tags=False),
                 tag_summary=tag_summary(sig),
                 image_url=signal_image_url(sig),
                 external_heat_score=heat,

@@ -6,6 +6,19 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "7654", "--directory", "docs"],
       "port": 7654
+    },
+    {
+      "name": "report",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "7655", "--directory", "web"],
+      "port": 7655
+    },
+    {
+      "name": "chat-app",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "streamlit", "run", "web/chat_app.py", "--server.headless", "true", "--server.port", "8510", "--browser.gatherUsageStats", "false"],
+      "port": 8510,
+      "env": { "XHS_COLLECT_CACHE": "1" }
     }
   ]
 }

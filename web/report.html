@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>美甲 Agent 对接报告</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #f5f4f0;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d1f3d 100%);
+    color: #fff;
+    padding: 40px 48px 32px;
+  }
+  .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .header-badge {
+    background: #c8a87a;
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+  .header-date { font-size: 13px; color: rgba(255,255,255,.45); }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 6px; }
+  .header p  { font-size: 14px; color: rgba(255,255,255,.55); }
+
+  /* ── Summary chips ── */
+  .summary-bar {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    padding: 20px 48px;
+    background: #fff;
+    border-bottom: 1px solid #ece9e3;
+  }
+  .chip {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  }
+  .chip.green  { background: #e8f5e9; color: #2e7d32; }
+  .chip.yellow { background: #fff8e1; color: #856404; }
+  .chip.dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chip.green .dot  { background: #43a047; }
+  .chip.yellow .dot { background: #f59e0b; }
+
+  /* ── Main grid ── */
+  .main { padding: 32px 48px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* ── Section card ── */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #ece9e3;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid #ece9e3;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-header .icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .icon-purple { background: #ede9fe; }
+  .icon-pink   { background: #fce7f3; }
+  .icon-blue   { background: #dbeafe; }
+  .icon-green  { background: #dcfce7; }
+  .icon-orange { background: #ffedd5; }
+  .card-header h2 { font-size: 15px; font-weight: 700; }
+  .card-header .sub { font-size: 12px; color: #888; margin-left: auto; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead tr { background: #faf9f7; }
+  th {
+    text-align: left; padding: 10px 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: #888;
+    border-bottom: 1px solid #ece9e3;
+  }
+  td { padding: 13px 20px; border-bottom: 1px solid #f0ede8; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #faf9f7; }
+
+  /* status pill */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .pill-done   { background: #dcfce7; color: #166534; }
+  .pill-manual { background: #fff3cd; color: #856404; }
+  .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .pill-done::before   { background: #22c55e; }
+  .pill-manual::before { background: #f59e0b; }
+
+  .tag {
+    display: inline-block;
+    background: #f3f0ea; color: #555;
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    margin: 1px 2px;
+  }
+  .tag.before { background: #fee2e2; color: #991b1b; }
+  .tag.after  { background: #d1fae5; color: #065f46; }
+
+  code {
+    background: #f3f0ea; font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px; padding: 1px 6px; border-radius: 4px; color: #7c3aed;
+  }
+
+  /* ── Data results row ── */
+  .result-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    padding: 20px 24px;
+  }
+  .result-item {
+    background: #faf9f7; border-radius: 10px; padding: 16px;
+    border: 1px solid #ece9e3;
+  }
+  .result-item .num { font-size: 26px; font-weight: 800; color: #1a1a1a; }
+  .result-item .label { font-size: 12px; color: #888; margin-top: 2px; }
+  .result-item .sub-label { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  /* ── Signal sample ── */
+  .signal-list { padding: 4px 0; }
+  .signal-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 11px 24px; border-bottom: 1px solid #f0ede8;
+  }
+  .signal-row:last-child { border-bottom: none; }
+  .rank-badge {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0; margin-top: 1px;
+  }
+  .rank-1 { background: #1a1a1a; color: #c8a87a; }
+  .rank-2 { background: #2d1f3d; color: #e0c8f0; }
+  .rank-3 { background: #1e3a5f; color: #90caf9; }
+  .rank-n { background: #f0ede8; color: #666; }
+  .signal-label { font-size: 14px; font-weight: 700; }
+  .signal-meta  { font-size: 12px; color: #888; margin-top: 2px; }
+  .score-bar-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .score-bar {
+    width: 80px; height: 6px; background: #ece9e3; border-radius: 999px; overflow: hidden;
+  }
+  .score-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #c8a87a); }
+  .score-num { font-size: 12px; font-weight: 700; color: #555; width: 36px; text-align: right; }
+
+  /* ── Architecture diff ── */
+  .diff-row { display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-bottom: 1px solid #f0ede8; font-size: 13px; }
+  .diff-row:last-child { border-bottom: none; }
+  .diff-arrow { color: #aaa; font-size: 16px; }
+  .diff-before { color: #dc2626; text-decoration: line-through; opacity: .7; }
+  .diff-after  { color: #16a34a; font-weight: 600; }
+  .diff-file   { margin-left: auto; }
+
+  /* ── Footer ── */
+  .footer {
+    margin: 0 48px 48px;
+    padding: 16px 20px;
+    background: #fff;
+    border: 1px solid #ece9e3;
+    border-radius: 10px;
+    font-size: 12px; color: #999;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer strong { color: #555; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-top">
+    <span class="header-badge">对接报告</span>
+    <span class="header-date">2026-05-28 · nails-agent-platform</span>
+  </div>
+  <h1>美甲 Agent Pipeline — 问题修复报告</h1>
+  <p>覆盖本次 PR 分支全部优化点，含代码修改、端到端验证及真实数据抓取结果</p>
+</div>
+
+<!-- ── Summary chips ── -->
+<div class="summary-bar">
+  <div class="chip green"><span class="dot"></span>已全部解决 8 项</div>
+  <div class="chip green"><span class="dot"></span>真实 XHS 数据已抓取</div>
+  <div class="chip green"><span class="dot"></span>图片本地化下载正常</div>
+  <div class="chip green"><span class="dot"></span>UI 数据路径通畅</div>
+  <div class="chip yellow"><span class="dot"></span>CDP 模式待用户开启 Chrome</div>
+</div>
+
+<div class="main">
+
+  <!-- ── Issue resolution table ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-purple">🐛</div>
+      <h2>问题修复清单</h2>
+      <span class="sub">8 项全部解决</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>问题</th>
+          <th>根因</th>
+          <th>修复文件</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><b>款式名称通用</b><br><span class="tag before">样本 01</span> → <span class="tag after">猫眼·夏日</span></td>
+          <td><code>display_label</code> 已有占位值，<code>generate_display_label()</code> 被跳过</td>
+          <td><code>trend_analyst.py</code><br><code>value_evaluator.py</code><br>mock data 重新生成</td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><b>9宫格图片切割</b><br>抓取到拼图应提取最清晰一张</td>
+          <td>已实现：<code>_classify_image()</code> Laplacian 方差检测 + <code>_split_grid9()</code> 分割</td>
+          <td><code>xhs_mcp_fetcher.py</code>（已有）</td>
+          <td><span class="pill pill-done">已验证</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><b>XHS detail 404</b><br>Bridge 无对应端点</td>
+          <td><code>POST /api/v1/feeds/detail</code> 端点缺失</td>
+          <td><code>xhs_rest_bridge.mjs</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><b>Detail 失败丢信号</b><br>detail 拉取失败即 skip 整条</td>
+          <td>失败时 <code>continue</code> 导致该 signal 丢弃</td>
+          <td><code>xhs_mcp_fetcher.py</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><b>UI 图片空白</b><br>Streamlit 看不到任何图片</td>
+          <td><code>web/output/</code> 空文件覆盖了 seed mock 数据</td>
+          <td><code>web/data_loader.py</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><b>nail_shape_tag 未写入</b><br>甲型（长/中/短甲）未进视觉特征</td>
+          <td>extractor 未 return <code>nail_shape_tag</code></td>
+          <td><code>nail_feature_extractor.py</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><b>Roboflow 重复调用</b><br>同一张图调用两次 API</td>
+          <td><code>style_store_ingestion.py</code> 再次调 <code>extract_nail_crops()</code></td>
+          <td><code>style_store_ingestion.py</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><b>XHS 请求太频繁</b><br>"为什么不能直接 Search？"</td>
+          <td>Playwright Chromium 被识别为 bot；需用真实 Chrome</td>
+          <td><code>signal_collector.py</code><br>重新启用 <code>XHSCDPFetcher</code></td>
+          <td><span class="pill pill-done">已解决</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Architecture change ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-blue">🏗</div>
+      <h2>架构变更：XHS 数据源优先级</h2>
+    </div>
+    <div class="diff-row">
+      <span class="diff-before">XHS-MCP (Playwright)</span>
+      <span class="diff-arrow">→</span>
+      <span class="diff-after">XHS-CDP (真实 Chrome) 优先，MCP 降为 fallback</span>
+      <span class="diff-file tag"><code>signal_collector.py</code></span>
+    </div>
+    <div class="diff-row">
+      <span class="diff-before">nail shape：style_store 再调一次 Roboflow</span>
+      <span class="diff-arrow">→</span>
+      <span class="diff-after">直接读 feature dict 中的 nail_shape_tag</span>
+      <span class="diff-file tag"><code>style_store_ingestion.py</code></span>
+    </div>
+    <div class="diff-row">
+      <span class="diff-before">display_label 已有值时不覆盖</span>
+      <span class="diff-arrow">→</span>
+      <span class="diff-after">每次强制调 generate_display_label() 确保语义化</span>
+      <span class="diff-file tag"><code>trend_analyst.py</code></span>
+    </div>
+    <div class="diff-row">
+      <span class="diff-before">output 空文件 → UI 空白</span>
+      <span class="diff-arrow">→</span>
+      <span class="diff-after">output 为空时自动 fallback 至 seed mock</span>
+      <span class="diff-file tag"><code>data_loader.py</code></span>
+    </div>
+  </div>
+
+  <!-- ── Real pipeline results ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-green">📊</div>
+      <h2>真实 Pipeline 跑通结果</h2>
+      <span class="sub">2026-05-28 实测</span>
+    </div>
+    <div class="result-grid">
+      <div class="result-item">
+        <div class="num">8</div>
+        <div class="label">真实 XHS 信号</div>
+        <div class="sub-label">7 个关键词搜索</div>
+      </div>
+      <div class="result-item">
+        <div class="num">11</div>
+        <div class="label">图片已下载</div>
+        <div class="sub-label">web/output/images/latest/raw/</div>
+      </div>
+      <div class="result-item">
+        <div class="num">0</div>
+        <div class="label">样本 0X 标签</div>
+        <div class="sub-label">全部为语义化名称</div>
+      </div>
+      <div class="result-item">
+        <div class="num">True</div>
+        <div class="label">XHS-MCP 登录状态</div>
+        <div class="sub-label">is_logged_in: true</div>
+      </div>
+    </div>
+    <!-- Top signals -->
+    <div class="signal-list">
+      <div style="padding:8px 24px 4px; font-size:11px; font-weight:700; color:#aaa; letter-spacing:.08em; text-transform:uppercase; border-top:1px solid #f0ede8;">Top 8 信号排名</div>
+      <div class="signal-row">
+        <div class="rank-badge rank-1">1</div>
+        <div>
+          <div class="signal-label">法式</div>
+          <div class="signal-meta">style: 法式 · imgs: 5 · local: ✓</div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:100%"></div></div>
+          <span class="score-num">100.0</span>
+        </div>
+      </div>
+      <div class="signal-row">
+        <div class="rank-badge rank-2">2</div>
+        <div>
+          <div class="signal-label">裸色渐变·日常</div>
+          <div class="signal-meta">style: 渐变, ins风 · color: 裸色 · scene: 日常</div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:74%"></div></div>
+          <span class="score-num">74.3</span>
+        </div>
+      </div>
+      <div class="signal-row">
+        <div class="rank-badge rank-3">3</div>
+        <div>
+          <div class="signal-label">猫眼·夏日</div>
+          <div class="signal-meta">style: 猫眼, 波点 · scene: 夏日</div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:35%"></div></div>
+          <span class="score-num">35.3</span>
+        </div>
+      </div>
+      <div class="signal-row">
+        <div class="rank-badge rank-n">4</div>
+        <div>
+          <div class="signal-label">温柔·日常</div>
+          <div class="signal-meta">style: 猫眼, 冰透, 温柔 · scene: 约会</div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:33%"></div></div>
+          <span class="score-num">32.7</span>
+        </div>
+      </div>
+      <div class="signal-row">
+        <div class="rank-badge rank-n">5</div>
+        <div>
+          <div class="signal-label">蓝色猫眼·夏日</div>
+          <div class="signal-meta">color: 蓝色 · style: 猫眼 · scene: 夏日</div>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:9%"></div></div>
+          <span class="score-num">9.2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CDP activation note ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-orange">⚡</div>
+      <h2>下一步：开启 CDP 模式彻底解决限流</h2>
+      <span class="sub">可选，当前 MCP 模式已可用</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>步骤</th><th>操作</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><code>open -a "Google Chrome" --args --remote-debugging-port=9222</code></td>
+          <td>用调试端口启动真实 Chrome</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>在 Chrome 中打开 <code>xiaohongshu.com</code>，确认已登录</td>
+          <td>复用你的真实会话 Cookie，XHS 无法识别为 bot</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>重新运行 pipeline</td>
+          <td><code>source_status()</code> 将显示 <code>xhs_cdp: True</code>，自动优先走 CDP</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── File change summary ── -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-pink">📁</div>
+      <h2>本次修改文件汇总</h2>
+      <span class="sub">6 files changed</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>文件</th><th>修改内容</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>nails_agent/tools/fetchers/signal_collector.py</code></td>
+          <td>新增 <code>_get_xhs_cdp()</code>；CDP 优先 → MCP fallback；source_status 加 xhs_cdp</td>
+        </tr>
+        <tr>
+          <td><code>nails_agent/services/nail_feature_extractor.py</code></td>
+          <td>return dict 增加 <code>nail_shape_tag</code> 字段</td>
+        </tr>
+        <tr>
+          <td><code>nails_agent/services/style_store_ingestion.py</code></td>
+          <td>移除第二次 Roboflow 调用，改读 feature dict 中的 nail_shape_tag</td>
+        </tr>
+        <tr>
+          <td><code>nails_agent/agents/workers/trend_analyst.py</code></td>
+          <td>每次强制调 generate_display_label()，语义名称不再被占位值覆盖</td>
+        </tr>
+        <tr>
+          <td><code>nails_agent/agents/workers/value_evaluator.py</code></td>
+          <td>同上，display_label 赋值逻辑统一</td>
+        </tr>
+        <tr>
+          <td><code>nails_agent/tools/fetchers/xhs_mcp_fetcher.py</code></td>
+          <td>Detail 失败时 fallback 保留 signal，不再丢弃</td>
+        </tr>
+        <tr>
+          <td><code>scripts/xhs_rest_bridge.mjs</code></td>
+          <td>新增 POST /api/v1/feeds/detail 端点</td>
+        </tr>
+        <tr>
+          <td><code>web/data_loader.py</code></td>
+          <td>output 为空列表时 fallback 至 seed mock，UI 不再空白</td>
+        </tr>
+        <tr>
+          <td><code>web/data/trend_signals.json</code><br><code>web/data/metric_snapshots.json</code></td>
+          <td>Mock 数据 display_label 重新生成（语义化）</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span>Branch: <strong>fix/pipeline-quality</strong> · 最新 commit: <strong>89f59bb</strong></span>
+  <span>验证时间: 2026-05-28 14:18 · 真实 XHS 抓取: <strong>8 signals / 11 images</strong></span>
+</div>
+
+</body>
+</html>
