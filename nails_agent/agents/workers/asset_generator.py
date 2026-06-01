@@ -9,11 +9,14 @@ Rule-based (no LLM call required for demo).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional
+
+import requests
 
 from nails_agent.models.schemas import (
     TrendAnalysisResult,
@@ -27,6 +30,8 @@ from nails_agent.services.trend_presentation import sample_label, signal_image_u
 
 _TZ8 = timezone(timedelta(hours=8))
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_ENHANCE_SRC_DIR = _PROJECT_ROOT / "web" / "output" / "images" / "enhance_src"
+_CONTENT_TYPE_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _log = logging.getLogger(__name__)
 
 # ── Caption templates ─────────────────────────────────────────────────────────
@@ -87,21 +92,41 @@ def _pricing(sig: TrendSignal) -> PricingInfo:
     )
 
 
-def _resolve_local_image(sig: TrendSignal) -> Optional[str]:
+def _download_remote(url: str) -> Optional[str]:
+    """Download a remote image to a local cache file; return its path or None."""
+    if not url.startswith(("http://", "https://")):
+        return None
+    try:
+        resp = requests.get(url, timeout=30, headers={"Referer": "https://www.xiaohongshu.com/"})
+        resp.raise_for_status()
+    except Exception as exc:
+        _log.warning("Failed to download source image %s: %s", url[:60], exc)
+        return None
+    ext = _CONTENT_TYPE_EXT.get(resp.headers.get("Content-Type", "").split(";")[0].strip(), ".jpg")
+    _ENHANCE_SRC_DIR.mkdir(parents=True, exist_ok=True)
+    out = _ENHANCE_SRC_DIR / (hashlib.md5(url.encode()).hexdigest()[:16] + ext)
+    out.write_bytes(resp.content)
+    return str(out)
+
+
+def _resolve_source_image(sig: TrendSignal) -> Optional[str]:
     """Resolve a draft's source image to a local file path the client can upload.
 
-    `signal_image_url` returns a local path when scraped images exist, else a remote
-    URL. ComfyUI upload needs a local file, so remote-only signals are skipped.
+    Prefers an existing local scraped file; otherwise downloads a remote image URL.
+    ComfyUI upload needs a local file, so a card counts as "having an image" if either
+    a local path exists or a remote URL can be fetched.
     """
-    raw = signal_image_url(sig)
-    if not raw:
-        return None
-    p = Path(raw)
-    if p.exists():
-        return str(p)
-    alt = _PROJECT_ROOT / raw
-    if alt.exists():
-        return str(alt)
+    for p in getattr(sig, "local_image_paths", None) or []:
+        path = Path(p)
+        if path.exists():
+            return str(path)
+        alt = _PROJECT_ROOT / p
+        if alt.exists():
+            return str(alt)
+    for url in getattr(sig, "image_urls", None) or []:
+        local = _download_remote(url)
+        if local:
+            return local
     return None
 
 
@@ -127,9 +152,9 @@ def _enhance_drafts(drafts: List[StyleCardDraft], signals: List[TrendSignal], to
 
     enhanced = 0
     for draft, sig in list(zip(drafts, signals))[:top_n]:
-        src = _resolve_local_image(sig)
+        src = _resolve_source_image(sig)
         if not src:
-            _log.info("No local source image for %s, skipping enhancement", draft.style_name)
+            _log.info("No source image for %s, skipping enhancement", draft.style_name)
             continue
         try:
             result = client.enhance(src, workflow="product_showcase")
