@@ -37,6 +37,7 @@ def _make_grid9(tmp_path: Path, name: str = "grid9.png", size: int = 900) -> Pat
 
 # ── _classify_image ────────────────────────────────────────────────────────────
 
+
 def test_wide_strip_classified(tmp_path: Path):
     """Wide horizontal image → 'wide_strip'."""
     p = _make_image(tmp_path, "wide.png", (3000, 1000))
@@ -82,9 +83,15 @@ def _make_portrait_grid9(tmp_path: Path, name: str = "pgrid.png", size=(900, 120
     draw = ImageDraw.Draw(img)
     cw, ch = size[0] // 3, size[1] // 3
     colors = [
-        (40, 40, 40), (220, 220, 220), (120, 80, 160),
-        (200, 180, 160), (30, 160, 90), (240, 200, 40),
-        (80, 120, 200), (160, 40, 40), (200, 200, 120),
+        (40, 40, 40),
+        (220, 220, 220),
+        (120, 80, 160),
+        (200, 180, 160),
+        (30, 160, 90),
+        (240, 200, 40),
+        (80, 120, 200),
+        (160, 40, 40),
+        (200, 200, 120),
     ]
     k = 0
     for r in range(3):
@@ -107,6 +114,7 @@ def test_portrait_grid9_no_separators(tmp_path: Path):
 
 
 # ── _split_grid9 ───────────────────────────────────────────────────────────────
+
 
 def test_split_grid9_produces_cells(tmp_path: Path):
     """Splitting a 9-grid image yields 1-2 cell files."""

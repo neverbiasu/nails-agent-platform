@@ -34,8 +34,7 @@ def _load(filename: str):
     if out.exists():
         data = _parse(out)
         # If output is empty, fall back to seed/mock so the UI isn't blank
-        empty = (isinstance(data, list) and len(data) == 0) or \
-                (isinstance(data, dict) and not data)
+        empty = (isinstance(data, list) and len(data) == 0) or (isinstance(data, dict) and not data)
         if not empty:
             return data
         if seed.exists():

@@ -163,6 +163,7 @@ def login_and_save(name: str, max_wait_s: int = 300) -> None:
         bridge_url = "http://localhost:18060/api/v1/accounts/reload"
         try:
             import urllib.request
+
             urllib.request.urlopen(
                 urllib.request.Request(bridge_url, method="POST", data=b""),
                 timeout=5,

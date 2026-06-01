@@ -302,9 +302,7 @@ class SignalCollector:
                 "keywords": list(keywords),
                 "signals": [s.model_dump(mode="json") for s in signals],
             }
-            _XHS_CACHE_PATH.write_text(
-                json.dumps(payload, ensure_ascii=False), encoding="utf-8"
-            )
+            _XHS_CACHE_PATH.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
             logger.info("XHS cache written: %d signals → %s", len(signals), _XHS_CACHE_PATH)
         except Exception as exc:
             logger.warning("Failed to write XHS cache: %s", exc)
@@ -374,9 +372,7 @@ class SignalCollector:
                 all_signals.extend(cached_xhs)
                 sources_used.append(f"xhs-cache({len(cached_xhs)})")
                 self.last_collection_real_sources_attempted = True
-                logger.info(
-                    "XHS: cache hit — %d signals, skipped live scrape", len(cached_xhs)
-                )
+                logger.info("XHS: cache hit — %d signals, skipped live scrape", len(cached_xhs))
 
         if use_xhs and cached_xhs is None:
             # Prefer real Chrome via CDP (avoids Playwright bot-detection rate-limits).

@@ -861,7 +861,7 @@ class XHSMCPFetcher:
                 """Peak full-width discontinuity near `frac` vs median baseline."""
                 idx = int(round(len(profile) * frac))
                 win = max(1, len(profile) // 200)
-                local = float(profile[max(0, idx - win): idx + win + 1].max())
+                local = float(profile[max(0, idx - win) : idx + win + 1].max())
                 baseline = float(np.median(profile)) + 1e-6
                 return local / baseline
 
@@ -966,7 +966,9 @@ class XHSMCPFetcher:
                     # NOT detour to sibling URLs — in practice those are poster /
                     # cover art (text overlays, props), so a clean cell from the
                     # grid is the best single nail we can surface for this signal.
-                    logger.info("9-grid composite — splitting 3×3, picking best cell: %s", path.name)
+                    logger.info(
+                        "9-grid composite — splitting 3×3, picking best cell: %s", path.name
+                    )
                     stem = f"{signal.trend_id}_{idx}"
                     cells = self._split_grid9(path, out_dir, stem)
                     path.unlink(missing_ok=True)

@@ -40,6 +40,7 @@ def main() -> None:
     # ~/.config/instaloader/session-USERNAME
     L.save_session_to_file()
     from instaloader.instaloader import get_default_session_filename
+
     path = get_default_session_filename(args.username)
     print(f"\nSession saved to: {path}")
     print(f"Add to .env:  INSTAGRAM_USERNAME={args.username}")
